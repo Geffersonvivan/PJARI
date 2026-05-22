@@ -136,7 +136,7 @@ STORAGES = {
 }
 
 # GCS para uploads em produção
-USE_GCS = not DEBUG
+USE_GCS = os.environ.get("USE_GCS", "False") == "True"
 
 if USE_GCS:
     STORAGES["default"] = {
