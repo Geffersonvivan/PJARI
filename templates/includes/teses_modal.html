@@ -1,0 +1,206 @@
+<!-- Banco de Teses Modal -->
+<div id="teses-modal"
+    class="fixed inset-0 z-50 flex items-center justify-center hidden bg-gray-900/60 backdrop-blur-sm p-4 transition-opacity">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden transform transition-all flex flex-col max-h-[90vh]">
+
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 flex-shrink-0">
+            <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2 mb-0">
+                <i class="ph ph-books text-purple-500"></i> Banco de Teses
+            </h3>
+            <button onclick="fecharModalTeses()"
+                class="text-gray-400 hover:text-gray-600 transition p-1 hover:bg-gray-100 rounded-lg shrink-0 ml-4 focus:outline-none">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="px-6 pt-4 flex gap-2 flex-shrink-0">
+            <button onclick="teseSwitchTab('minhas')" id="tab-minhas"
+                class="px-4 py-1.5 rounded-full text-xs font-bold transition bg-purple-100 text-purple-700">Minhas Teses</button>
+            <button onclick="teseSwitchTab('comunidade')" id="tab-comunidade"
+                class="px-4 py-1.5 rounded-full text-xs font-bold transition bg-gray-100 text-gray-500 hover:bg-gray-200">Comunidade</button>
+        </div>
+
+        <!-- Body -->
+        <div class="p-6 overflow-y-auto flex-1 bg-white">
+
+            <!-- Busca -->
+            <div class="mb-4">
+                <input type="text" id="tese-busca" placeholder="Buscar teses..."
+                    class="w-full px-4 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
+                    oninput="teseCarregar()">
+            </div>
+
+            <!-- Nova tese (só na aba minhas) -->
+            <div id="tese-form-novo" class="bg-gray-50 rounded-2xl p-4 border border-gray-100 mb-5">
+                <input type="text" id="tese-novo-titulo" placeholder="Titulo da tese..."
+                    class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm mb-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
+                <textarea id="tese-novo-conteudo" rows="2" placeholder="Conteudo / fundamentacao..."
+                    class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"></textarea>
+                <div class="flex items-center justify-between mt-2">
+                    <label class="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
+                        <input type="checkbox" id="tese-novo-public" class="rounded">
+                        Compartilhar com a comunidade
+                    </label>
+                    <button onclick="teseCriar()" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm font-bold transition">
+                        Salvar Tese
+                    </button>
+                </div>
+            </div>
+
+            <!-- Lista -->
+            <div class="space-y-3" id="teses-lista">
+                <div id="teses-empty" class="text-center py-10 text-gray-400">
+                    <i class="ph ph-books text-4xl mb-2 block opacity-50"></i>
+                    <p class="text-sm font-medium">Nenhuma tese encontrada.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let _teseTabAtual = 'minhas';
+
+function abrirModalTeses() {
+    document.getElementById('teses-modal').classList.remove('hidden');
+    teseCarregar();
+}
+
+function fecharModalTeses() {
+    document.getElementById('teses-modal').classList.add('hidden');
+}
+
+document.getElementById('teses-modal').addEventListener('click', function(e) {
+    if (e.target === this) fecharModalTeses();
+});
+
+function teseSwitchTab(tab) {
+    _teseTabAtual = tab;
+    document.getElementById('tab-minhas').className = tab === 'minhas'
+        ? 'px-4 py-1.5 rounded-full text-xs font-bold transition bg-purple-100 text-purple-700'
+        : 'px-4 py-1.5 rounded-full text-xs font-bold transition bg-gray-100 text-gray-500 hover:bg-gray-200';
+    document.getElementById('tab-comunidade').className = tab === 'comunidade'
+        ? 'px-4 py-1.5 rounded-full text-xs font-bold transition bg-purple-100 text-purple-700'
+        : 'px-4 py-1.5 rounded-full text-xs font-bold transition bg-gray-100 text-gray-500 hover:bg-gray-200';
+    document.getElementById('tese-form-novo').style.display = tab === 'minhas' ? '' : 'none';
+    teseCarregar();
+}
+
+async function teseCarregar() {
+    const busca = document.getElementById('tese-busca').value.trim();
+    const lista = document.getElementById('teses-lista');
+    const empty = document.getElementById('teses-empty');
+    let url = `/api/teses-banco/?filtro=${_teseTabAtual}`;
+    if (busca) url += `&q=${encodeURIComponent(busca)}`;
+
+    try {
+        const resp = await fetch(url);
+        const data = await resp.json();
+        const teses = data.teses || [];
+
+        // Limpar
+        lista.innerHTML = '';
+        if (teses.length === 0) {
+            lista.innerHTML = `<div class="text-center py-10 text-gray-400">
+                <i class="ph ph-books text-4xl mb-2 block opacity-50"></i>
+                <p class="text-sm font-medium">Nenhuma tese encontrada.</p>
+            </div>`;
+            return;
+        }
+
+        teses.forEach(function(t) {
+            const isOwn = _teseTabAtual === 'minhas';
+            const actions = isOwn
+                ? `<button onclick="teseExcluir(${t.id})" class="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition" title="Excluir">
+                        <i class="ph ph-trash text-base"></i>
+                   </button>`
+                : `<button onclick="teseImportar(${t.id})" class="px-3 py-1 bg-purple-50 hover:bg-purple-100 text-purple-600 rounded-lg text-xs font-bold transition" title="Importar para minhas teses">
+                        <i class="ph ph-download-simple"></i> Importar
+                   </button>`;
+
+            const badge = t.is_public
+                ? '<span class="text-[10px] bg-green-50 text-green-600 font-bold px-2 py-0.5 rounded-full">Publica</span>'
+                : '';
+
+            lista.insertAdjacentHTML('beforeend', `
+                <div class="flex items-start justify-between gap-3 p-4 rounded-xl border border-gray-100 hover:border-purple-200 hover:bg-purple-50/30 transition-all">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <p class="text-sm font-semibold text-gray-800 truncate">${_teseEsc(t.titulo)}</p>
+                            ${badge}
+                        </div>
+                        <p class="text-xs text-gray-500 line-clamp-2">${_teseEsc((t.conteudo || '').substring(0, 200))}</p>
+                        ${t.user__username && _teseTabAtual === 'comunidade' ? `<p class="text-[10px] text-gray-400 mt-1">por ${_teseEsc(t.user__username)} · ${t.usage_count || 0} usos</p>` : ''}
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0">${actions}</div>
+                </div>`);
+        });
+    } catch (e) { console.error(e); }
+}
+
+function _teseEsc(str) {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.innerText = str;
+    return d.innerHTML;
+}
+
+function _teseCSRF() {
+    const el = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (el) return el.value;
+    const c = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+    return c ? c.split('=')[1] : '';
+}
+
+async function teseCriar() {
+    const titulo = document.getElementById('tese-novo-titulo').value.trim();
+    const conteudo = document.getElementById('tese-novo-conteudo').value.trim();
+    const isPublic = document.getElementById('tese-novo-public').checked;
+
+    if (!titulo || !conteudo) { alert('Titulo e conteudo sao obrigatorios.'); return; }
+
+    try {
+        const resp = await fetch('/api/teses-banco/criar/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': _teseCSRF()},
+            body: JSON.stringify({titulo, conteudo, is_public: isPublic}),
+        });
+        if (resp.ok) {
+            document.getElementById('tese-novo-titulo').value = '';
+            document.getElementById('tese-novo-conteudo').value = '';
+            document.getElementById('tese-novo-public').checked = false;
+            teseCarregar();
+        } else {
+            const err = await resp.json();
+            alert(err.error || 'Erro ao criar tese.');
+        }
+    } catch (e) { console.error(e); alert('Erro de conexao.'); }
+}
+
+async function teseExcluir(id) {
+    if (!confirm('Excluir esta tese?')) return;
+    try {
+        await fetch(`/api/teses-banco/${id}/excluir/`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': _teseCSRF()},
+        });
+        teseCarregar();
+    } catch (e) { console.error(e); }
+}
+
+async function teseImportar(id) {
+    try {
+        const resp = await fetch(`/api/teses-banco/${id}/importar/`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': _teseCSRF()},
+        });
+        if (resp.ok) {
+            alert('Tese importada para seu banco!');
+        }
+    } catch (e) { console.error(e); }
+}
+</script>

@@ -1,0 +1,690 @@
+{% extends "base.html" %}
+{% load static pareceres_tags %}
+{% block title %}P-JARI — Processo {{ processo.recorrente|default:"Novo" }}{% endblock %}
+
+{% block sub_nav %}{% endblock %}
+
+{% block content %}
+<div class="w-full py-5 flex-1 flex flex-col" style="padding-left:50px;padding-right:50px;"
+     id="wizard-root"
+     data-processo-id="{{ processo.pk }}"
+     data-fase="{{ fase }}"
+     data-passo="{{ passo_atual }}"
+     data-csrf="{{ csrf_token }}"
+     data-url-fase="{% url 'pareceres:api_fase' pk=processo.pk %}"
+     data-url-avancar="{% url 'pareceres:api_avancar' pk=processo.pk %}"
+     data-url-task-status="{% url 'pareceres:api_task_status' task_id='__TASK__' %}"
+     data-url-wizard="{% url 'pareceres:processo_wizard' pk=processo.pk %}"
+     data-url-documentos-upload="{% url 'pareceres:api_documentos_upload' pk=processo.pk %}"
+     data-url-dados-extraidos="{% url 'pareceres:api_dados_extraidos' pk=processo.pk %}"
+     data-url-confirmar-dados="{% url 'pareceres:api_confirmar_dados' pk=processo.pk %}"
+     data-url-admissibilidade-confirmar="{% url 'pareceres:api_admissibilidade_confirmar' pk=processo.pk %}"
+     data-url-admissibilidade-recalcular="{% url 'pareceres:api_admissibilidade_recalcular' pk=processo.pk %}"
+     data-url-teses-confirmar="{% url 'pareceres:api_teses_confirmar' pk=processo.pk %}"
+     data-url-parecer-dados="{% url 'pareceres:api_parecer_dados' pk=processo.pk %}"
+     data-url-parecer-editar="{% url 'pareceres:api_parecer_editar' pk=processo.pk %}"
+     data-url-auditoria-finalizar="{% url 'pareceres:api_auditoria_finalizar' pk=processo.pk %}">
+
+  <!-- ── PROGRESS CARD ──────────────────────── -->
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
+    <div class="flex items-center justify-between mb-3">
+      <p class="text-sm font-semibold text-gray-700">Passo {{ passo_atual }} de 6</p>
+      <p class="text-xs text-gray-400" id="fase-label">{{ fase_label }}</p>
+    </div>
+    <div class="flex items-center gap-1 mb-1" id="stepper-bars">
+      {% with labels="Identificação,Documentos,Admissibilidade,Tese,Parecer,Finalizar" %}
+      {% for label in labels|split:"," %}
+      <div class="flex-1 flex flex-col items-center gap-1">
+        <div class="w-full h-1.5 rounded-full progress-seg {% if forloop.counter < passo_atual %}done{% elif forloop.counter == passo_atual %}current{% endif %}"></div>
+        <span class="progress-label {% if forloop.counter == passo_atual %}active{% elif forloop.counter < passo_atual %}done{% endif %}">{{ label }}</span>
+      </div>
+      {% endfor %}
+      {% endwith %}
+    </div>
+  </div>
+
+  <!-- ── CONTENT AREA (split: PDF sidebar + wizard panel) ──── -->
+  <div class="flex flex-1 gap-4" id="wizard-content-area"
+       data-url-pdf-proxy="{% url 'pareceres:pdf_proxy' pk=processo.pk tipo='__TIPO__' %}">
+
+    <!-- PDF Sidebar (visible from step 2 onward) -->
+    <div id="pdf-sidebar" class="{% if passo_atual < 2 %}hidden{% endif %}" style="flex:1.2;min-width:0;display:flex;flex-direction:column;">
+      <div id="pdf-sidebar-expanded" class="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col flex-1 overflow-hidden">
+        <!-- Tab bar -->
+        <div class="flex items-center gap-1.5 bg-gray-50 px-3 py-2 border-b border-gray-100" style="border-radius:12px 12px 0 0;">
+          {% if has_consolidado %}
+          <button type="button" class="pdf-tab active" data-tipo="consolidado"
+                  onclick="switchPdfTab(this)">
+            <i class="ph ph-file-pdf text-red-400" style="font-size:13px;"></i> Consolidado
+          </button>
+          {% endif %}
+          {% if has_autuacao %}
+          <button type="button" class="pdf-tab" data-tipo="autuacao"
+                  onclick="switchPdfTab(this)">
+            <i class="ph ph-file-pdf text-red-400" style="font-size:13px;"></i> Autuação
+          </button>
+          {% endif %}
+          {% if has_ata %}
+          <button type="button" class="pdf-tab" data-tipo="ata"
+                  onclick="switchPdfTab(this)">
+            <i class="ph ph-file-pdf text-red-400" style="font-size:13px;"></i> Ata
+          </button>
+          {% endif %}
+          <div class="flex-1"></div>
+          <button type="button" class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-blue-300 hover:text-blue-600 transition-all" title="Buscar no PDF"
+                  onclick="triggerPdfSearch()" style="box-shadow:0 1px 2px rgba(0,0,0,.06);">
+            <i class="ph ph-magnifying-glass" style="font-size:13px;"></i>
+            <span>Buscar: <kbd style="font-size:10px;background:#f1f3f4;border:1px solid #dadce0;border-radius:3px;padding:0 4px;">Ctrl+F</kbd> ou <kbd style="font-size:10px;background:#f1f3f4;border:1px solid #dadce0;border-radius:3px;padding:0 4px;">⌘+F</kbd></span>
+          </button>
+          <button type="button" class="p-1 text-gray-400 hover:text-gray-600 transition-colors" title="Recolher"
+                  onclick="togglePdfCol()">
+            <i class="ph ph-caret-left" style="font-size:15px;"></i>
+          </button>
+        </div>
+        <!-- PDF iframe -->
+        <iframe id="pdf-docs-frame" src="" style="border:none;width:100%;flex:1;display:block;"></iframe>
+      </div>
+    </div>
+
+    <!-- Collapsed strip -->
+    <div id="pdf-sidebar-strip" class="{% if passo_atual < 2 %}hidden{% endif %}"
+         style="display:none;flex:0 0 40px;cursor:pointer;"
+         onclick="togglePdfCol()">
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center h-full py-4">
+        <i class="ph ph-caret-right text-gray-400 mb-2"></i>
+        <span class="text-xs font-bold text-gray-400" style="writing-mode:vertical-lr;letter-spacing:2px;">PDF</span>
+      </div>
+    </div>
+
+    <!-- Main wizard panel -->
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 flex flex-col flex-1 relative" id="wizard-panel" style="min-width:0;">
+
+    <!-- PASSO 1: Upload do Consolidado (modal) -->
+    <div class="wizard-step flex-1 flex items-center justify-center {% if passo_atual != 1 %}hidden{% endif %}" data-step="1">
+
+      <!-- Modal backdrop -->
+      <div class="fixed inset-0 z-50 flex items-center justify-center p-4" id="modal-documentos">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden z-10">
+
+          <!-- Header -->
+          <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div class="flex items-center gap-2">
+              <i class="ph ph-files text-blue-600 text-xl"></i>
+              <h2 class="text-base font-semibold text-gray-800">Carregar Documentos do Processo</h2>
+            </div>
+            <button onclick="window.location.href='{% url 'pareceres:home' %}'" class="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+              <i class="ph ph-x text-lg"></i>
+            </button>
+          </div>
+
+          <!-- Body (upload) -->
+          <div id="modal-body-upload" class="px-6 py-5">
+            <p class="text-sm text-gray-600 mb-1">Anexe o PDF do processo para iniciar a analise.</p>
+            <p class="text-xs text-gray-400 mb-5">Necessario: <strong>Consolidado do processo</strong>.</p>
+
+            <!-- Drop zone -->
+            <input id="doc-file-input" type="file" accept=".pdf" style="display:none;">
+            <div id="doc-dropzone"
+                 class="border-2 border-dashed border-gray-300 rounded-2xl py-8 px-6 text-center cursor-pointer transition-all hover:border-blue-400 hover:bg-blue-50/30"
+                 style="min-height:140px;">
+              <i class="ph ph-upload-simple text-gray-400 block mb-2" style="font-size:40px;pointer-events:none;"></i>
+              <p style="pointer-events:none;" class="text-sm font-semibold text-gray-700 mb-1">Arraste os PDFs aqui ou clique para selecionar</p>
+              <p style="pointer-events:none;" class="text-xs text-gray-400">Apenas arquivos .PDF</p>
+            </div>
+
+            <!-- File info -->
+            <div id="doc-file-info" style="display:none;" class="mt-4 flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+              <i class="ph ph-file-pdf text-red-500 text-xl"></i>
+              <div class="flex-1 min-w-0">
+                <p id="doc-file-name" class="text-sm font-medium text-gray-800 truncate"></p>
+                <p id="doc-file-size" class="text-xs text-gray-400"></p>
+              </div>
+              <button type="button" id="doc-file-remove" class="p-1 text-gray-400 hover:text-red-500 transition-colors">
+                <i class="ph ph-x text-base" style="pointer-events:none;"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Body (loading — hidden by default) -->
+          <div id="modal-body-loading" style="display:none;" class="px-6 py-12 text-center">
+            <div class="spinner mb-4 mx-auto" style="width:40px;height:40px;border-width:4px"></div>
+            <p class="text-gray-700 font-semibold">Enviando documentos...</p>
+            <p class="text-gray-400 text-sm mt-1">Nao feche esta janela.</p>
+          </div>
+
+          <!-- Footer -->
+          <div id="modal-footer" class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+            <p id="doc-status-text" class="text-xs text-gray-400">Nenhum arquivo selecionado</p>
+            <button type="button" id="btn-iniciar-analise" disabled
+                    class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2">
+              Iniciar Analise
+              <i class="ph ph-arrow-right" style="pointer-events:none;"></i>
+            </button>
+          </div>
+
+          <script>
+          // Inline script — garante que roda após o DOM do modal existir
+          (function(){
+            var _file = null;
+            var inp   = document.getElementById('doc-file-input');
+            var zone  = document.getElementById('doc-dropzone');
+            var info  = document.getElementById('doc-file-info');
+            var fname = document.getElementById('doc-file-name');
+            var fsize = document.getElementById('doc-file-size');
+            var rmBtn = document.getElementById('doc-file-remove');
+            var stxt  = document.getElementById('doc-status-text');
+            var btn   = document.getElementById('btn-iniciar-analise');
+            var bodyU = document.getElementById('modal-body-upload');
+            var bodyL = document.getElementById('modal-body-loading');
+            var foot  = document.getElementById('modal-footer');
+
+            function fmtSize(b){ return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'; }
+
+            function pick(f){
+              if(!f||!f.name.toLowerCase().endsWith('.pdf')){alert('Apenas arquivos .PDF');return;}
+              _file=f;
+              fname.textContent=f.name;
+              fsize.textContent=fmtSize(f.size);
+              info.style.display='';
+              stxt.textContent='1 arquivo selecionado';
+              btn.disabled=false;
+            }
+            function clear(){
+              _file=null; inp.value='';
+              info.style.display='none';
+              stxt.textContent='Nenhum arquivo selecionado';
+              btn.disabled=true;
+            }
+
+            zone.addEventListener('click',function(){inp.click();});
+            zone.addEventListener('dragover',function(e){e.preventDefault();zone.style.borderColor='#2563eb';zone.style.background='#eff6ff';});
+            zone.addEventListener('dragleave',function(){zone.style.borderColor='';zone.style.background='';});
+            zone.addEventListener('drop',function(e){e.preventDefault();zone.style.borderColor='';zone.style.background='';if(e.dataTransfer.files.length)pick(e.dataTransfer.files[0]);});
+            inp.addEventListener('change',function(){if(inp.files.length)pick(inp.files[0]);});
+            rmBtn.addEventListener('click',clear);
+
+            btn.addEventListener('click',function(){
+              if(!_file)return;
+              bodyU.style.display='none';
+              foot.style.display='none';
+              bodyL.style.display='';
+              // Dispara upload via wizard.js
+              window._wizSelectedFile=_file;
+              if(window._wizDoUpload) window._wizDoUpload();
+            });
+          })();
+          </script>
+        </div>
+      </div>
+
+      <!-- Progress overlay (shown after upload, during extraction) -->
+      <div id="doc-loading" class="hidden">
+        <div class="flex flex-col items-center justify-center py-20">
+          <div class="w-full max-w-md mb-4">
+            <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div id="doc-progress-bar" class="h-full bg-blue-600 rounded-full transition-all duration-500" style="width:1%"></div>
+            </div>
+            <p id="doc-progress-pct" class="text-right text-xs text-gray-400 mt-1">1%</p>
+          </div>
+          <p id="doc-progress-msg" class="text-blue-600 font-semibold text-sm uppercase tracking-wide">VERIFICANDO PRAZOS...</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- PASSO 2: Dados Extraídos (revisão + data_sessao) -->
+    <div class="wizard-step flex-1 {% if passo_atual != 2 %}hidden{% endif %}" data-step="2">
+      <div class="max-w-2xl mx-auto">
+
+        <!-- Banner -->
+        <div class="bg-blue-50 border border-blue-200 rounded-xl px-5 py-3 mb-6 flex items-start gap-3">
+          <i class="ph ph-pencil-simple text-blue-600 text-xl mt-0.5"></i>
+          <div>
+            <p class="text-sm font-semibold text-blue-800">Preencha os dados do processo</p>
+            <p class="text-xs text-blue-600">Informe as datas e dados necessarios e confirme para avancar.</p>
+          </div>
+        </div>
+
+        <!-- Form -->
+        <form id="form-dados-extraidos" class="space-y-4">
+
+          <!-- Data da Sessão (linha inteira, obrigatório) -->
+          <div>
+            <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+              Data da Sessao
+              <span class="text-orange-400 text-[10px] font-normal">— obrigatorio</span>
+            </label>
+            <div class="relative">
+              <input type="date" name="data_sessao" required
+                     onclick="this.showPicker()"
+                     class="w-full border border-gray-200 rounded-lg px-4 py-3 pr-20 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer date-paste">
+              <button type="button" class="btn-colar-data" title="Colar data copiada">
+                <i class="ph ph-clipboard-text"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Grid 2 colunas: Recorrente + Prazo Protocolo / Data Protocolo + Páginas Defesa -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+                Recorrente
+              </label>
+              <input type="text" name="recorrente" id="field-recorrente"
+                     placeholder="Nome do recorrente"
+                     class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+            </div>
+            <div>
+              <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+                Prazo Protocolo
+              </label>
+              <div class="relative">
+                <input type="date" name="prazo_final" id="field-prazo-final"
+                       onclick="this.showPicker()"
+                       class="w-full border border-gray-200 rounded-lg px-4 py-3 pr-20 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer date-paste">
+                <button type="button" class="btn-colar-data" title="Colar data copiada">
+                  <i class="ph ph-clipboard-text"></i>
+                </button>
+              </div>
+            </div>
+            <div>
+              <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+                Data Protocolo
+              </label>
+              <div class="relative">
+                <input type="date" name="data_protocolo" id="field-data-protocolo"
+                       onclick="this.showPicker()"
+                       class="w-full border border-gray-200 rounded-lg px-4 py-3 pr-20 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer date-paste">
+                <button type="button" class="btn-colar-data" title="Colar data copiada">
+                  <i class="ph ph-clipboard-text"></i>
+                </button>
+              </div>
+            </div>
+            <div>
+              <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+                Paginas Defesa
+              </label>
+              <input type="text" name="paginas_defesa" id="field-paginas-defesa"
+                     placeholder="Ex: 54-56"
+                     class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+            </div>
+          </div>
+
+          <!-- Botão confirmar -->
+          <div class="pt-4">
+            <button type="submit" id="btn-confirmar-dados"
+                    class="w-full bg-blue-700 hover:bg-blue-800 text-white py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2">
+              <i class="ph ph-check"></i>
+              Confirmar e Avancar
+            </button>
+            <p class="text-center text-xs text-orange-500 mt-2">
+              <i class="ph ph-warning"></i>
+              Obs: Conferir todas as datas e informacoes antes de avancar!
+            </p>
+          </div>
+        </form>
+      </div>
+
+      <div id="dados-loading" class="hidden absolute inset-0 bg-white/90 flex flex-col items-center justify-center rounded-2xl">
+        <div class="spinner mb-4" style="width:40px;height:40px;border-width:4px"></div>
+        <p class="text-gray-600 font-medium">Calculando admissibilidade...</p>
+      </div>
+    </div>
+
+    <!-- PASSO 3: Admissibilidade -->
+    <div class="wizard-step flex-1 {% if passo_atual != 3 %}hidden{% endif %}" data-step="3">
+      <div class="max-w-3xl mx-auto">
+        <div class="text-center mb-6">
+          <h2 class="text-xl font-bold text-gray-900 mb-2">Admissibilidade</h2>
+          <p class="text-gray-500 text-sm">Revise os resultados e confirme ou altere as decisoes do julgador.</p>
+        </div>
+
+        <!-- Tabela de datas (expandível) -->
+        <details class="mb-6">
+          <summary class="flex items-center gap-2 text-sm text-blue-600 cursor-pointer font-medium">
+            <i class="ph ph-table text-base"></i>
+            Tabela de datas sensiveis
+          </summary>
+          <div id="adm-tabela" class="mt-3 prose-jari text-sm border border-gray-200 rounded-xl p-4 bg-gray-50 overflow-x-auto"></div>
+        </details>
+
+        <!-- Texto da admissibilidade (expandível) -->
+        <details class="mb-6">
+          <summary class="flex items-center gap-2 text-sm text-blue-600 cursor-pointer font-medium">
+            <i class="ph ph-file-text text-base"></i>
+            Resultado da analise automatica
+          </summary>
+          <div id="adm-resultado" class="mt-3 prose-jari text-sm border border-gray-200 rounded-xl p-4 bg-gray-50"></div>
+        </details>
+
+        <!-- Rota indicator -->
+        <div id="adm-rota-badge" class="hidden mb-6 text-center">
+          <!-- Preenchido via JS após confirmação -->
+        </div>
+
+        <!-- Cards de admissibilidade (preenchidos via JS) -->
+        <div id="adm-cards" class="space-y-4 mb-6"></div>
+
+        <!-- Aviso de erro (cálculo falhou) -->
+        <div id="adm-erro" class="hidden mb-6">
+          <div class="bg-red-50 border border-red-200 rounded-xl px-5 py-4 flex items-start gap-3">
+            <i class="ph ph-warning-circle text-red-600 text-xl mt-0.5"></i>
+            <div>
+              <p class="text-sm font-semibold text-red-800">Erro no calculo de admissibilidade</p>
+              <p id="adm-erro-msg" class="text-xs text-red-600 mt-1"></p>
+            </div>
+          </div>
+          <div class="flex gap-3 mt-3">
+            <button id="btn-voltar-dados"
+                    class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2.5 rounded-xl font-semibold text-sm transition-colors">
+              Voltar ao passo 2
+            </button>
+            <button id="btn-recalcular-adm"
+                    class="flex-1 bg-amber-600 hover:bg-amber-700 text-white py-2.5 rounded-xl font-semibold text-sm transition-colors">
+              Recalcular
+            </button>
+          </div>
+        </div>
+
+        <button id="btn-confirmar-adm"
+                class="w-full bg-blue-700 hover:bg-blue-800 text-white py-2.5 rounded-xl font-semibold text-sm transition-colors">
+          Confirmar e Avancar
+        </button>
+      </div>
+      <div id="adm-loading" class="hidden absolute inset-0 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center rounded-2xl z-10">
+        <div class="spinner mb-4" style="width:44px;height:44px;border-width:4px"></div>
+        <p class="text-gray-600 font-medium text-sm" style="animation: pulse 2s ease-in-out infinite;">Processando decisoes do julgador...</p>
+        <p class="text-gray-400 text-xs mt-1">Isso pode levar alguns segundos</p>
+      </div>
+    </div>
+
+    <!-- PASSO 4: Tese -->
+    <div class="wizard-step flex-1 {% if passo_atual != 4 %}hidden{% endif %}" data-step="4">
+      <div class="max-w-3xl mx-auto">
+        <div class="text-center mb-6">
+          <h2 class="text-xl font-bold text-gray-900 mb-2">Analise de Teses</h2>
+          <p class="text-gray-500 text-sm">Revise as teses extraidas e decida o acolhimento de cada uma.</p>
+        </div>
+
+        <!-- Mensagem mérito prejudicado (hidden by default) -->
+        <div id="teses-prejudicado" class="hidden mb-6">
+          <div class="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 flex items-start gap-3">
+            <i class="ph ph-warning text-amber-600 text-xl mt-0.5"></i>
+            <div>
+              <p class="text-sm font-semibold text-amber-800">Merito prejudicado</p>
+              <p class="text-xs text-amber-600">Nao ha teses a analisar. O processo sera encaminhado direto para o parecer.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cards de teses (preenchidos via JS) -->
+        <div id="teses-cards" class="space-y-4 mb-6"></div>
+
+        <button id="btn-confirmar-teses"
+                class="w-full bg-blue-700 hover:bg-blue-800 text-white py-2.5 rounded-xl font-semibold text-sm transition-colors">
+          Confirmar e Gerar Parecer
+        </button>
+      </div>
+      <div id="tese-loading" class="hidden absolute inset-0 bg-white/90 flex flex-col items-center justify-center rounded-2xl">
+        <div class="spinner mb-4" style="width:40px;height:40px;border-width:4px"></div>
+        <p class="text-gray-600 font-medium" id="tese-loading-msg">Analisando teses...</p>
+      </div>
+    </div>
+
+    <!-- PASSO 5: Parecer -->
+    <div class="wizard-step flex-1 {% if passo_atual != 5 %}hidden{% endif %}" data-step="5">
+      <div class="max-w-3xl mx-auto">
+        <div class="text-center mb-6">
+          <h2 class="text-xl font-bold text-gray-900 mb-2">Parecer Tecnico</h2>
+          <p class="text-gray-500 text-sm">Revise o parecer gerado. Voce pode editar antes de finalizar.</p>
+        </div>
+
+        <!-- Badge DEFERIDO / INDEFERIDO -->
+        <div id="parecer-badge" class="text-center mb-6"></div>
+
+        <!-- Parecer text (view mode) -->
+        <div id="parecer-view" class="mb-4">
+          <div id="parecer-content" class="prose-jari text-sm bg-gray-50 border border-gray-200 rounded-xl p-6 min-h-[200px]" style="max-height:60vh;overflow-y:auto;"></div>
+        </div>
+
+        <!-- Editor inline (hidden by default, toggled by button) -->
+        <div id="parecer-editor-wrap" class="hidden mb-4">
+          <textarea id="parecer-editor" class="w-full border border-gray-300 rounded-xl p-4 text-sm min-h-[300px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Edite o parecer aqui..."></textarea>
+        </div>
+
+        <!-- Toggle editor + provider info -->
+        <div class="flex items-center justify-between mb-4">
+          <button type="button" id="btn-toggle-editor" class="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
+            <i class="ph ph-pencil-simple"></i> Editar parecer
+          </button>
+          <span id="parecer-provider" class="text-xs text-gray-400"></span>
+        </div>
+
+        <!-- Dossiê / Fontes (colapsável) -->
+        <details class="mb-6" id="parecer-dossie-wrap" style="display:none;">
+          <summary class="flex items-center gap-2 text-sm text-blue-600 cursor-pointer font-medium">
+            <i class="ph ph-book-open text-base"></i>
+            Dossie / Fontes
+          </summary>
+          <div id="parecer-dossie" class="mt-3 prose-jari text-sm border border-gray-200 rounded-xl p-4 bg-gray-50"></div>
+        </details>
+
+        <button id="btn-finalizar-parecer"
+                class="w-full bg-blue-700 hover:bg-blue-800 text-white py-2.5 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2">
+          <i class="ph ph-shield-check"></i>
+          Executar Auditoria e Finalizar
+        </button>
+      </div>
+      <div id="parecer-loading" class="hidden absolute inset-0 bg-white/90 flex flex-col items-center justify-center rounded-2xl">
+        <div class="spinner mb-4" style="width:40px;height:40px;border-width:4px"></div>
+        <p class="text-gray-600 font-medium" id="parecer-loading-msg">Gerando parecer...</p>
+        <p class="text-gray-400 text-sm mt-1">Isso pode levar alguns minutos.</p>
+      </div>
+    </div>
+
+    <!-- PASSO 6: Finalizar -->
+    <div class="wizard-step flex-1 {% if passo_atual != 6 %}hidden{% endif %}" data-step="6">
+      <div class="max-w-3xl mx-auto">
+
+        <!-- Success header -->
+        <div class="text-center mb-6">
+          <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="ph ph-check-circle text-green-600" style="font-size:32px;"></i>
+          </div>
+          <h2 class="text-xl font-bold text-gray-900 mb-2">Processo Finalizado</h2>
+          <p class="text-gray-500 text-sm">O parecer foi auditado e salvo com sucesso.</p>
+        </div>
+
+        <!-- Selo de conformidade (blindagem) -->
+        <div id="blindagem-card" class="mb-6">
+          <div id="blindagem-selo" class="flex items-center gap-3 rounded-xl px-5 py-3 border mb-2" style="display:none;">
+            <i id="blindagem-icon" class="text-2xl"></i>
+            <div class="flex-1">
+              <span class="block text-xs font-medium text-gray-500">JariMatch — Blindagem normativa</span>
+              <span id="blindagem-label" class="block text-sm font-bold"></span>
+            </div>
+            <button type="button" id="blindagem-toggle" class="p-1 text-gray-400 hover:text-gray-600" onclick="document.getElementById('blindagem-detalhes').classList.toggle('hidden');var a=document.getElementById('blindagem-arrow');a.style.transform=a.style.transform?'':'rotate(180deg)';">
+              <i id="blindagem-arrow" class="ph ph-caret-down" style="transition:transform .2s;"></i>
+            </button>
+          </div>
+          <!-- Detalhes expandíveis -->
+          <div id="blindagem-detalhes" class="hidden rounded-xl border border-gray-200 bg-gray-50 p-4 prose-jari text-sm mb-4"></div>
+        </div>
+
+        <!-- Checklist de auditoria -->
+        <div id="audit-checklist-wrap" class="mb-6 rounded-xl border border-gray-200 overflow-hidden" style="display:none;">
+          <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center gap-2">
+            <i class="ph ph-list-checks text-blue-600"></i>
+            <span class="text-sm font-semibold text-gray-700">Checklist de Auditoria</span>
+          </div>
+          <div id="audit-checklist" class="bg-white"></div>
+        </div>
+
+        <!-- Parecer final (visível + copiar + editar) -->
+        <div class="mb-6">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <i class="ph ph-file-text text-blue-600"></i> Parecer Completo
+            </h3>
+            <button type="button" id="btn-toggle-editor-final" class="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
+              <i class="ph ph-pencil-simple"></i> Editar
+            </button>
+          </div>
+          <div id="parecer-final-view">
+            <div id="parecer-final" class="prose-jari text-sm bg-gray-50 border border-gray-200 rounded-xl p-6" style="max-height:60vh;overflow-y:auto;"></div>
+          </div>
+          <div id="parecer-editor-final-wrap" class="hidden">
+            <textarea id="parecer-editor-final" class="w-full border border-gray-300 rounded-xl p-4 text-sm min-h-[300px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Edite o parecer aqui..."></textarea>
+            <div class="flex items-center gap-2 mt-2">
+              <button type="button" id="btn-salvar-editor-final" class="px-4 py-1.5 text-sm font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition flex items-center gap-1">
+                <i class="ph ph-floppy-disk"></i> Salvar
+              </button>
+              <button type="button" id="btn-cancelar-editor-final" class="px-4 py-1.5 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center justify-center gap-3">
+          <a href="{% url 'pareceres:exportar_parecer_pdf' pk=processo.pk %}"
+             class="inline-flex items-center gap-2 bg-gray-800 hover:bg-gray-900 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors"
+             style="text-decoration:none;">
+            <i class="ph ph-file-pdf text-lg"></i>
+            Baixar PDF
+          </a>
+
+          <!-- Salvar em Pasta -->
+          <div class="relative" id="salvar-pasta-wrap">
+            <button type="button" id="btn-salvar-pasta"
+                    class="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors">
+              <i class="ph ph-folder-plus text-lg"></i>
+              Salvar
+            </button>
+            <div id="dropdown-meses" class="hidden absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50 max-h-72 overflow-y-auto">
+              <p class="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Salvar no mês:</p>
+              {% for num, nome in meses %}
+              <button type="button"
+                      data-pasta-nome="{{ num|stringformat:'02d' }} - {{ nome }}"
+                      class="mes-option w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition flex items-center gap-2">
+                <i class="ph ph-folder text-amber-400" style="font-size:14px;"></i>
+                {{ nome }}
+              </button>
+              {% endfor %}
+            </div>
+          </div>
+
+          <a href="{% url 'pareceres:home' %}"
+             class="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors"
+             style="text-decoration:none;">
+            Voltar aos Processos
+          </a>
+        </div>
+
+      </div>
+      <div id="audit-loading" class="hidden absolute inset-0 bg-white/90 flex flex-col items-center justify-center rounded-2xl">
+        <div class="spinner mb-4" style="width:40px;height:40px;border-width:4px"></div>
+        <p class="text-gray-600 font-medium">Auditando parecer...</p>
+      </div>
+    </div>
+
+  </div><!-- /.wizard-panel -->
+
+  </div><!-- /.wizard-content-area -->
+
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .pdf-tab {
+    padding: 5px 14px; font-size: 12.5px; font-weight: 500;
+    color: #5f6368; background: transparent; border: none;
+    border-radius: 20px; cursor: pointer; white-space: nowrap;
+    transition: all .15s; outline: none;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .pdf-tab.active {
+    background: #fff; color: #1a73e8; font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0,0,0,.15), 0 0 0 1px rgba(0,0,0,.06);
+  }
+  .pdf-tab:hover:not(.active) { background: rgba(0,0,0,.04); }
+
+  /* Botão colar data */
+  .btn-colar-data {
+    position: absolute; right: 40px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer; padding: 4px 6px;
+    color: #9ca3af; border-radius: 6px; transition: all .15s;
+    display: flex; align-items: center; font-size: 18px;
+  }
+  .btn-colar-data:hover { color: #2563eb; background: #eff6ff; }
+  .btn-colar-data.ok { color: #16a34a; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/wizard.js' %}"></script>
+<script>
+(function(){
+  var _pdfCollapsed = false;
+  var pdfUrlTpl = document.getElementById('wizard-content-area')?.dataset.urlPdfProxy || '';
+
+  window.switchPdfTab = function(btn) {
+    document.querySelectorAll('.pdf-tab').forEach(function(t){ t.classList.remove('active'); });
+    btn.classList.add('active');
+    var tipo = btn.dataset.tipo;
+    var url = pdfUrlTpl.replace('__TIPO__', tipo);
+    document.getElementById('pdf-docs-frame').src = url + '#zoom=page-width';
+  };
+
+  window.triggerPdfSearch = function() {
+    var frame = document.getElementById('pdf-docs-frame');
+    if (!frame) return;
+    try {
+      frame.contentWindow.focus();
+      frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'f', code: 'KeyF', ctrlKey: true, metaKey: true, bubbles: true
+      }));
+    } catch(e) { frame.focus(); }
+  };
+
+  window.togglePdfCol = function() {
+    var sidebar  = document.getElementById('pdf-sidebar');
+    var expanded = document.getElementById('pdf-sidebar-expanded');
+    var strip    = document.getElementById('pdf-sidebar-strip');
+    if (!sidebar) return;
+
+    _pdfCollapsed = !_pdfCollapsed;
+    if (_pdfCollapsed) {
+      sidebar.style.display = 'none';
+      strip.style.display   = '';
+    } else {
+      sidebar.style.display = 'flex';
+      strip.style.display   = 'none';
+    }
+  };
+
+  window.collapsePdf = function() { if (!_pdfCollapsed) togglePdfCol(); };
+  window.expandPdf   = function() { if (_pdfCollapsed)  togglePdfCol(); };
+
+  // Esconder sidebar completamente (sem strip)
+  window.hidePdfSidebar = function() {
+    var sidebar = document.getElementById('pdf-sidebar');
+    var strip   = document.getElementById('pdf-sidebar-strip');
+    if (sidebar) sidebar.style.display = 'none';
+    if (strip)   strip.style.display   = 'none';
+    _pdfCollapsed = true;
+  };
+
+  // Auto-load first tab
+  var firstTab = document.querySelector('.pdf-tab');
+  if (firstTab) switchPdfTab(firstTab);
+
+  // Esconder sidebar nos passos 5 e 6 (PDF não é necessário)
+  var _passo = parseInt('{{ passo_atual }}', 10);
+  if (_passo >= 5) hidePdfSidebar();
+})();
+</script>
+{% endblock %}

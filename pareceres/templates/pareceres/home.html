@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% load pareceres_tags %}
+{% block title %}P-JARI — Assessor JARI{% endblock %}
+
+{% block sub_nav %}
+<div id="folders-bar" class="bg-gray-50 border-b border-gray-100 sticky top-[60px] z-40" style="overflow:visible;">
+  <div class="flex items-center gap-1 flex-nowrap mx-auto w-full" style="padding:5px 50px;max-width:1440px;overflow:visible;">
+    {% for pasta in pastas %}
+    <div class="relative folder-chip-wrap flex-shrink-0">
+      <button type="button"
+        onclick="togglePastaDropdown({{ pasta.id }}, this)"
+        class="folder-chip flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium border transition-all whitespace-nowrap
+               border-gray-200 bg-white text-gray-600 hover:border-blue-300 hover:bg-blue-50"
+        data-pasta-id="{{ pasta.id }}">
+        <i class="ph ph-folder text-amber-400" style="font-size:12px;"></i>
+        {{ pasta.nome|nome_mes_abrev }}
+        <span class="text-gray-400">({{ pasta.processos.count }})</span>
+        <i class="ph ph-caret-down text-gray-400" style="font-size:8px;"></i>
+      </button>
+      <div class="pasta-dropdown hidden absolute top-full left-0 mt-1 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50 max-h-72 overflow-y-auto"
+           data-dropdown-id="{{ pasta.id }}">
+        {% for proc in pasta.processos.all %}
+        <div class="flex items-center gap-2 px-3 py-2 hover:bg-blue-50 transition text-sm group" id="proc-row-{{ proc.pk }}">
+          <a href="{% url 'pareceres:processo_wizard' pk=proc.pk %}"
+             class="flex items-center gap-2 flex-1 min-w-0"
+             style="text-decoration:none;">
+            <i class="ph ph-file-text text-blue-400" style="font-size:14px;flex-shrink:0;"></i>
+            <span class="flex-1 text-gray-700 truncate">{{ proc.created_at|date:"Y" }} - {{ proc.recorrente|default:"Sem nome" }}</span>
+          </a>
+          {% if proc.resultado_final == "DEFERIDO" %}
+          <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 flex-shrink-0">DEF</span>
+          {% elif proc.resultado_final == "INDEFERIDO" %}
+          <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 flex-shrink-0">IND</span>
+          {% endif %}
+          <button type="button" onclick="excluirProcesso({{ proc.pk }}, this)"
+                  title="Excluir processo"
+                  class="text-gray-300 hover:text-red-500 transition flex-shrink-0 opacity-0 group-hover:opacity-100">
+            <i class="ph ph-trash" style="font-size:14px;"></i>
+          </button>
+        </div>
+        {% empty %}
+        <p class="px-3 py-2 text-xs text-gray-400 text-center">Nenhum parecer neste mês</p>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="w-full py-5 flex-1 flex flex-col" style="padding-left:50px;padding-right:50px;">
+
+  <!-- ── PROGRESS CARD ──────────────────────── -->
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
+    <div class="flex items-center justify-between mb-3">
+      <p class="text-sm font-semibold text-gray-700">Passo 1 de 6</p>
+      <p class="text-xs text-gray-400">Identificação</p>
+    </div>
+    <div class="flex items-center gap-1 mb-1">
+      <div class="flex-1 flex flex-col items-center gap-1">
+        <div class="w-full h-1.5 rounded-full progress-seg current"></div>
+        <span class="progress-label active">Identificação</span>
+      </div>
+      <div class="flex-1 flex flex-col items-center gap-1">
+        <div class="w-full h-1.5 rounded-full progress-seg"></div>
+        <span class="progress-label">Documentos</span>
+      </div>
+      <div class="flex-1 flex flex-col items-center gap-1">
+        <div class="w-full h-1.5 rounded-full progress-seg"></div>
+        <span class="progress-label">Admissibilidade</span>
+      </div>
+      <div class="flex-1 flex flex-col items-center gap-1">
+        <div class="w-full h-1.5 rounded-full progress-seg"></div>
+        <span class="progress-label">Tese</span>
+      </div>
+      <div class="flex-1 flex flex-col items-center gap-1">
+        <div class="w-full h-1.5 rounded-full progress-seg"></div>
+        <span class="progress-label">Parecer</span>
+      </div>
+      <div class="flex-1 flex flex-col items-center gap-1">
+        <div class="w-full h-1.5 rounded-full progress-seg"></div>
+        <span class="progress-label">Finalizar</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CONTENT CARD ───────────────────────── -->
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 flex flex-col flex-1">
+    <div class="flex-1 flex items-center justify-center">
+      <div class="text-center">
+        <p class="text-gray-600 text-lg leading-relaxed">
+          Seja bem-vindo(a) ao <strong class="text-gray-800">P-JARI/SC!</strong>
+        </p>
+        <p class="text-gray-600 text-lg leading-relaxed">
+          Sistema de apoio técnico aos Membros Julgadores da
+        </p>
+        <p class="text-gray-600 text-lg leading-relaxed">
+          Junta Administrativa de Recursos de Infrações (JARI) de Santa Catarina.
+        </p>
+        <div class="mt-6">
+          <a href="{% url 'pareceres:processo_novo' %}"
+             class="inline-flex items-center gap-2 px-8 py-2.5 bg-blue-700 text-white text-sm font-semibold rounded-xl hover:bg-blue-800 transition active:scale-[.98]"
+             style="text-decoration:none;">
+            Iniciar →
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal Confirmar Exclusão -->
+<div id="modal-excluir" class="hidden fixed inset-0 z-[9999] flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="fecharModalExcluir()"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-sm mx-4 overflow-hidden animate-[adm-slide-in_.2s_ease-out]">
+    <div class="p-6 text-center">
+      <div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+        <i class="ph ph-trash text-red-500" style="font-size:28px;"></i>
+      </div>
+      <h3 class="text-lg font-bold text-gray-800 mb-2">Excluir processo?</h3>
+      <p class="text-sm text-gray-500 leading-relaxed">
+        Esta ação é <strong class="text-red-600">permanente</strong>. O processo e todos os dados associados (documentos, admissibilidade, parecer) serão excluídos definitivamente.
+      </p>
+    </div>
+    <div class="flex border-t border-gray-100">
+      <button type="button" onclick="fecharModalExcluir()"
+              class="flex-1 px-4 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">
+        Cancelar
+      </button>
+      <button type="button" id="btn-confirmar-excluir"
+              class="flex-1 px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 transition border-l border-gray-100">
+        Excluir
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+var _dropdownAberto = null;
+var _excluirProcId = null;
+var _excluirBtn = null;
+
+function togglePastaDropdown(pastaId, btn) {
+  var dropdown = document.querySelector('[data-dropdown-id="' + pastaId + '"]');
+  if (!dropdown) return;
+
+  // Fechar todos os outros
+  document.querySelectorAll(".pasta-dropdown").forEach(function(d) {
+    if (d !== dropdown) d.classList.add("hidden");
+  });
+  document.querySelectorAll(".folder-chip").forEach(function(c) {
+    if (c !== btn) c.classList.remove("ring-2", "ring-blue-400", "border-blue-400");
+  });
+
+  var isOpen = !dropdown.classList.contains("hidden");
+  if (isOpen) {
+    dropdown.classList.add("hidden");
+    btn.classList.remove("ring-2", "ring-blue-400", "border-blue-400");
+    _dropdownAberto = null;
+  } else {
+    dropdown.classList.remove("hidden");
+    btn.classList.add("ring-2", "ring-blue-400", "border-blue-400");
+    _dropdownAberto = pastaId;
+  }
+}
+
+// Fechar dropdown ao clicar fora
+document.addEventListener("click", function(e) {
+  if (!e.target.closest(".folder-chip-wrap")) {
+    document.querySelectorAll(".pasta-dropdown").forEach(function(d) {
+      d.classList.add("hidden");
+    });
+    document.querySelectorAll(".folder-chip").forEach(function(c) {
+      c.classList.remove("ring-2", "ring-blue-400", "border-blue-400");
+    });
+    _dropdownAberto = null;
+  }
+});
+
+// Excluir processo — abre modal
+function excluirProcesso(procId, btn) {
+  _excluirProcId = procId;
+  _excluirBtn = btn;
+  document.getElementById("modal-excluir").classList.remove("hidden");
+}
+
+function fecharModalExcluir() {
+  document.getElementById("modal-excluir").classList.add("hidden");
+  _excluirProcId = null;
+  _excluirBtn = null;
+}
+
+document.getElementById("btn-confirmar-excluir").addEventListener("click", function() {
+  if (!_excluirProcId) return;
+  var procId = _excluirProcId;
+  var btn = _excluirBtn;
+
+  var csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
+  fetch("/api/processo/" + procId + "/excluir/", {
+    method: "POST",
+    headers: {"Content-Type": "application/json", "X-CSRFToken": csrfToken},
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.ok) {
+      var row = document.getElementById("proc-row-" + procId);
+      if (row) row.remove();
+      // Atualizar contagem no chip
+      if (btn) {
+        var wrap = btn.closest(".folder-chip-wrap");
+        if (wrap) {
+          var chip = wrap.querySelector(".folder-chip");
+          var countSpan = chip.querySelector("span.text-gray-400");
+          if (countSpan) {
+            var m = countSpan.textContent.match(/\d+/);
+            if (m) countSpan.textContent = "(" + Math.max(0, parseInt(m[0]) - 1) + ")";
+          }
+        }
+      }
+    } else {
+      alert(data.error || "Erro ao excluir.");
+    }
+    fecharModalExcluir();
+  });
+});
+</script>
+{% endblock %}

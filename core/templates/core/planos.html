@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}P-JARI — Planos{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-10">
+
+  {% if success %}
+  <div class="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 text-center">
+    Pagamento confirmado! Seus creditos foram atualizados.
+  </div>
+  {% endif %}
+
+  {% if cancel %}
+  <div class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-800 text-center">
+    Checkout cancelado. Nenhuma cobranca foi realizada.
+  </div>
+  {% endif %}
+
+  <div class="text-center mb-10">
+    <h1 class="text-3xl font-bold text-gray-900">Planos e Precos</h1>
+    <p class="text-gray-500 mt-2">Escolha o plano ideal para sua demanda.</p>
+    {% if user_credits is not None %}
+    <p class="mt-3 text-sm text-gray-600">
+      Voce tem <span class="font-bold text-brand-600">{{ user_credits }}</span> credito{{ user_credits|pluralize:"s" }} disponive{{ user_credits|pluralize:"l,is" }}.
+      {% if user_is_pro %}<span class="ml-2 inline-block bg-brand-100 text-brand-700 text-xs px-2 py-0.5 rounded-full font-semibold">PRO</span>{% endif %}
+    </p>
+    {% endif %}
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-6">
+
+    <!-- Pacote Inicial -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 flex flex-col">
+      <h2 class="text-xl font-bold text-gray-900">Pacote Inicial</h2>
+      <p class="text-gray-500 text-sm mt-1">5 pareceres avulsos</p>
+      <div class="mt-4">
+        <span class="text-3xl font-bold text-gray-900">R$ 49,90</span>
+        <span class="text-gray-400 text-sm ml-1">unico</span>
+      </div>
+      <ul class="mt-6 space-y-2 text-sm text-gray-600 flex-1">
+        <li class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          5 creditos de parecer
+        </li>
+        <li class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Sem expiracao
+        </li>
+        <li class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Todas as funcionalidades
+        </li>
+      </ul>
+      {% if user %}
+      <a href="{% url 'checkout' %}?plan=basic"
+         class="mt-6 block text-center bg-gray-800 hover:bg-gray-900 text-white px-5 py-2.5 rounded-lg font-medium transition-colors">
+        Comprar
+      </a>
+      {% else %}
+      <a href="{% url 'pareceres:home' %}"
+         class="mt-6 block text-center bg-gray-800 hover:bg-gray-900 text-white px-5 py-2.5 rounded-lg font-medium transition-colors">
+        Entrar para comprar
+      </a>
+      {% endif %}
+    </div>
+
+    <!-- Plano Profissional -->
+    <div class="bg-white rounded-xl border-2 border-brand-500 p-6 flex flex-col relative">
+      <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-600 text-white text-xs px-3 py-1 rounded-full font-semibold">Recomendado</span>
+      <h2 class="text-xl font-bold text-gray-900">Plano Profissional</h2>
+      <p class="text-gray-500 text-sm mt-1">30 pareceres/mes + suporte prioritario</p>
+      <div class="mt-4">
+        <span class="text-3xl font-bold text-brand-600">R$ 199,90</span>
+        <span class="text-gray-400 text-sm ml-1">/mes</span>
+      </div>
+      <ul class="mt-6 space-y-2 text-sm text-gray-600 flex-1">
+        <li class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          25 creditos base + 5 bonus
+        </li>
+        <li class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Renovacao mensal automatica
+        </li>
+        <li class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Suporte prioritario
+        </li>
+        <li class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Todas as funcionalidades
+        </li>
+      </ul>
+      {% if user %}
+      <a href="{% url 'checkout' %}?plan=pro"
+         class="mt-6 block text-center bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-lg font-medium transition-colors">
+        Assinar agora
+      </a>
+      {% else %}
+      <a href="{% url 'pareceres:home' %}"
+         class="mt-6 block text-center bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-lg font-medium transition-colors">
+        Entrar para assinar
+      </a>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <p class="text-center text-xs text-gray-400 mt-8">
+    Pagamentos processados com seguranca via Stripe. Cancelamento a qualquer momento.
+  </p>
+</div>
+{% endblock %}

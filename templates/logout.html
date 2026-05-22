@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saindo - P-JARI</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: #02040A;
+            height: 100vh; width: 100vw;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+        }
+        .wrapper { display: flex; flex-direction: column; align-items: center; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner {
+            width: 2.5rem; height: 2.5rem;
+            margin-bottom: 1rem;
+            animation: spin 1s linear infinite;
+        }
+        h2 { font-size: 1.25rem; font-weight: 600; color: #fff; }
+        p  { font-size: 0.875rem; color: rgba(255,255,255,0.5); margin-top: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <svg class="spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle style="opacity:.25" cx="12" cy="12" r="10" stroke="#22c55e" stroke-width="4"></circle>
+          <path style="opacity:.75" fill="#22c55e" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <h2>Saindo...</h2>
+        <p>Encerrando sua sessão.</p>
+    </div>
+
+    <script>
+        window.clerkPublishableKey = "{{ CLERK_PUBLISHABLE_KEY }}";
+    </script>
+    <script
+        crossorigin="anonymous"
+        data-clerk-publishable-key="{{ CLERK_PUBLISHABLE_KEY }}"
+        src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+        type="text/javascript">
+    </script>
+
+    <script type="module">
+        import { ptBR } from 'https://cdn.jsdelivr.net/npm/@clerk/localizations/dist/pt-BR.mjs';
+
+        async function doLogout() {
+            // Wait for Clerk
+            let attempts = 0;
+            while (!window.Clerk && attempts < 50) {
+                await new Promise(r => setTimeout(r, 100));
+                attempts++;
+            }
+
+            if (window.Clerk) {
+                try {
+                    await window.Clerk.load({ localization: ptBR });
+                    await window.Clerk.signOut();
+                } catch(e) {
+                    console.error('Clerk signOut error:', e);
+                }
+            }
+
+            // Limpa cookie __session
+            document.cookie = '__session=; path=/; max-age=0';
+            window.location.href = '/';
+        }
+
+        doLogout();
+    </script>
+</body>
+</html>

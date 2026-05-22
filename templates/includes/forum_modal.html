@@ -1,0 +1,306 @@
+<!-- Forum Modal -->
+<style>
+    .forum-text a { color: #3b82f6; text-decoration: underline; }
+    .forum-text a:hover { color: #2563eb; }
+    @keyframes slideUpFade { to { transform: translateY(0); opacity: 1; } }
+</style>
+
+<div id="forum-modal"
+    class="fixed inset-0 z-50 flex items-center justify-center hidden bg-gray-900/60 backdrop-blur-sm p-4 transition-opacity">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden transform transition-all flex flex-col max-h-[90vh]">
+
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 flex-shrink-0">
+            <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2 mb-0">
+                <i class="ph ph-chats-circle text-blue-500"></i> Forum dos Julgadores
+            </h3>
+            <button onclick="fecharModalForum()"
+                class="text-gray-400 hover:text-gray-600 transition p-1 hover:bg-gray-100 rounded-lg shrink-0 ml-4 focus:outline-none">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Body -->
+        <div class="p-6 overflow-y-auto flex-1 bg-white relative">
+            <div class="absolute top-0 right-0 w-64 h-64 bg-blue-50 rounded-full blur-3xl -mx-20 -my-20 opacity-50 pointer-events-none"></div>
+
+            <div class="relative z-10 flex flex-col md:flex-row md:items-start justify-between gap-6">
+                <!-- Coluna Principal -->
+                <div class="flex-1">
+                    <p class="text-sm text-gray-500 mb-6">Mural central para debates, recados importantes e tira-duvidas operacionais da comunidade JARI.</p>
+
+                    <!-- Nova publicacao -->
+                    <div class="bg-gray-50 rounded-2xl p-4 border border-gray-100 mb-6">
+                        <form id="formNovoPost" onsubmit="forumSubmitPost(event)">
+                            <textarea id="forum_novo_conteudo" rows="3"
+                                placeholder="O que voce quer compartilhar com a comunidade?"
+                                class="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-sm text-sm resize-none bg-white"
+                                required></textarea>
+                            <div class="flex justify-end mt-3">
+                                <button type="submit" id="btnSubmitPost"
+                                    class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-sm transition-colors">
+                                    Publicar no Mural
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Feed -->
+                    <div class="space-y-4" id="forum-feed-container">
+                        <div class="text-center py-12 text-gray-400 bg-gray-50 rounded-2xl border border-dashed border-gray-200" id="forum-empty">
+                            <i class="ph ph-chats-circle text-4xl mb-2 block opacity-50"></i>
+                            <p class="text-sm font-medium">O Mural esta vazio.</p>
+                            <p class="text-xs mt-1">Seja o primeiro a compartilhar algo com a comunidade JARI.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Coluna Lateral -->
+                <div class="w-full md:w-64 shrink-0 hidden md:block space-y-3">
+                    <h4 class="font-bold text-gray-800 text-sm mb-3 flex items-center gap-2">
+                        <i class="ph ph-push-pin text-lg text-red-400"></i> Regras do Forum
+                    </h4>
+                    <div class="group relative bg-white border border-gray-100 rounded-2xl p-3 shadow-sm hover:shadow-md transition-all overflow-hidden">
+                        <div class="absolute inset-y-0 left-0 w-1 bg-blue-500 rounded-l-2xl group-hover:w-1.5 transition-all"></div>
+                        <div class="pl-2 flex gap-3 items-start">
+                            <i class="ph ph-shield-check text-blue-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h5 class="text-xs font-bold text-gray-800 mb-0.5">Decoro</h5>
+                                <p class="text-[11px] text-gray-500 leading-tight">Mantenha um nivel tecnico e respeitoso nos debates.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="group relative bg-white border border-gray-100 rounded-2xl p-3 shadow-sm hover:shadow-md transition-all overflow-hidden">
+                        <div class="absolute inset-y-0 left-0 w-1 bg-red-400 rounded-l-2xl group-hover:w-1.5 transition-all"></div>
+                        <div class="pl-2 flex gap-3 items-start">
+                            <i class="ph ph-lock text-red-400 text-lg mt-0.5"></i>
+                            <div>
+                                <h5 class="text-xs font-bold text-gray-800 mb-0.5">Sigilo Absoluto</h5>
+                                <p class="text-[11px] text-gray-500 leading-tight">Nunca exponha nomes ou placas de processos reais.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="group relative bg-white border border-gray-100 rounded-2xl p-3 shadow-sm hover:shadow-md transition-all overflow-hidden">
+                        <div class="absolute inset-y-0 left-0 w-1 bg-emerald-400 rounded-l-2xl group-hover:w-1.5 transition-all"></div>
+                        <div class="pl-2 flex gap-3 items-start">
+                            <i class="ph ph-scales text-emerald-500 text-lg mt-0.5"></i>
+                            <div>
+                                <h5 class="text-xs font-bold text-gray-800 mb-0.5">Clareza Juridica</h5>
+                                <p class="text-[11px] text-gray-500 leading-tight">Ao ter duvidas, poste o trecho da lei para facilitar.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function _forumCSRF() {
+    const el = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (el) return el.value;
+    const c = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+    return c ? c.split('=')[1] : '';
+}
+
+function abrirModalForum() {
+    document.getElementById('forum-modal').classList.remove('hidden');
+    forumCarregarPosts();
+}
+
+function fecharModalForum() {
+    document.getElementById('forum-modal').classList.add('hidden');
+}
+
+// Fechar com ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') fecharModalForum();
+});
+// Fechar clicando no backdrop
+document.getElementById('forum-modal').addEventListener('click', function(e) {
+    if (e.target === this) fecharModalForum();
+});
+
+function _forumUrlize(text) {
+    if (!text) return "";
+    const div = document.createElement('div');
+    div.innerText = text;
+    const escaped = div.innerHTML;
+    return escaped.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+}
+
+function _forumDateFmt(dateStr) {
+    try {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+    } catch { return dateStr; }
+}
+
+async function forumCarregarPosts() {
+    const container = document.getElementById('forum-feed-container');
+    try {
+        const resp = await fetch('/api/forum/');
+        const data = await resp.json();
+        const posts = data.posts || [];
+
+        if (posts.length === 0) {
+            document.getElementById('forum-empty').style.display = '';
+            return;
+        }
+
+        document.getElementById('forum-empty').style.display = 'none';
+
+        // Limpar posts antigos (manter empty state)
+        const emptyEl = document.getElementById('forum-empty');
+        container.innerHTML = '';
+        container.appendChild(emptyEl);
+        emptyEl.style.display = 'none';
+
+        posts.forEach(function(post) {
+            const initial = (post.display_name || '?')[0].toUpperCase();
+            const html = `
+            <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:border-gray-200 transition" id="post-${post.id}">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-inner shrink-0">
+                        ${initial}
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-800 text-sm leading-tight">${post.display_name}</h4>
+                        <span class="text-xs text-gray-400">${_forumDateFmt(post.created_at)}</span>
+                    </div>
+                </div>
+                <div class="text-sm text-gray-800 font-semibold mb-1">${_forumUrlize(post.titulo)}</div>
+                <div class="text-sm text-gray-700 leading-relaxed mb-3 whitespace-pre-wrap forum-text">${_forumUrlize(post.conteudo)}</div>
+                <div class="flex items-center gap-4 pt-3 border-t border-gray-50">
+                    <button onclick="forumCurtir(${post.id})" class="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-blue-600 transition focus:outline-none" id="btn-like-${post.id}">
+                        <i class="ph ph-thumbs-up text-base"></i>
+                        <span id="count-like-${post.id}">${post.qtd_curtidas || 0}</span>
+                    </button>
+                    <button onclick="forumToggleComentarios(${post.id})" class="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 transition focus:outline-none">
+                        <i class="ph ph-chat-dots text-base"></i>
+                        Comentar (<span id="count-comentarios-${post.id}">${post.qtd_comentarios || 0}</span>)
+                    </button>
+                </div>
+                <div id="comentarios-section-${post.id}" class="hidden mt-4 pt-3 border-t border-gray-100 bg-gray-50/50 rounded-xl p-4">
+                    <div id="lista-comentarios-${post.id}" class="space-y-3 mb-4 max-h-60 overflow-y-auto"></div>
+                    <form onsubmit="forumComentar(event, ${post.id})" class="flex gap-2">
+                        <input type="text" id="novo_comentario_${post.id}" placeholder="Escreva um comentario..."
+                            class="flex-1 bg-white border border-gray-200 rounded-full px-4 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" required>
+                        <button type="submit" class="bg-gray-800 hover:bg-black text-white rounded-full p-2 h-8 w-8 flex items-center justify-center transition focus:outline-none shrink-0" title="Enviar">
+                            <i class="ph ph-paper-plane-tilt text-xs"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>`;
+            container.insertAdjacentHTML('beforeend', html);
+        });
+    } catch (e) {
+        console.error('Erro ao carregar forum:', e);
+    }
+}
+
+async function forumSubmitPost(event) {
+    event.preventDefault();
+    const textarea = document.getElementById('forum_novo_conteudo');
+    const btn = document.getElementById('btnSubmitPost');
+    const conteudo = textarea.value.trim();
+    if (!conteudo) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Publicando...';
+
+    try {
+        const resp = await fetch('/api/forum/criar/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': _forumCSRF()},
+            body: JSON.stringify({titulo: conteudo.split('\n')[0].substring(0, 100), conteudo: conteudo}),
+        });
+        if (resp.ok) {
+            textarea.value = '';
+            forumCarregarPosts();
+        } else {
+            const err = await resp.json();
+            alert(err.error || 'Erro ao publicar.');
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Erro de conexao.');
+    }
+    btn.disabled = false;
+    btn.textContent = 'Publicar no Mural';
+}
+
+async function forumCurtir(postId) {
+    try {
+        const resp = await fetch(`/api/forum/${postId}/curtir/`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': _forumCSRF()},
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            document.getElementById(`count-like-${postId}`).textContent = data.total;
+        }
+    } catch (e) { console.error(e); }
+}
+
+function forumToggleComentarios(postId) {
+    const secao = document.getElementById(`comentarios-section-${postId}`);
+    if (!secao) return;
+    const wasHidden = secao.classList.toggle('hidden');
+    if (!wasHidden) forumCarregarComentarios(postId);
+}
+
+async function forumCarregarComentarios(postId) {
+    const lista = document.getElementById(`lista-comentarios-${postId}`);
+    try {
+        const resp = await fetch(`/api/forum/${postId}/comentarios/`);
+        const data = await resp.json();
+        lista.innerHTML = '';
+        (data.comentarios || []).forEach(function(c) {
+            const initial = (c.display_name || '?')[0].toUpperCase();
+            lista.insertAdjacentHTML('beforeend', `
+                <div class="flex gap-3">
+                    <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs shrink-0">${initial}</div>
+                    <div class="bg-white border border-gray-100 rounded-2xl rounded-tl-none p-3 shadow-sm flex-1">
+                        <div class="flex justify-between items-baseline mb-1">
+                            <span class="font-bold text-xs text-gray-800">${c.display_name}</span>
+                            <span class="text-[10px] text-gray-400">${_forumDateFmt(c.created_at)}</span>
+                        </div>
+                        <p class="text-xs text-gray-700 leading-relaxed forum-text">${_forumUrlize(c.conteudo)}</p>
+                    </div>
+                </div>`);
+        });
+    } catch (e) { console.error(e); }
+}
+
+async function forumComentar(event, postId) {
+    event.preventDefault();
+    const input = document.getElementById(`novo_comentario_${postId}`);
+    if (!input.value.trim()) return;
+
+    try {
+        const resp = await fetch(`/api/forum/${postId}/comentar/`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': _forumCSRF()},
+            body: JSON.stringify({conteudo: input.value}),
+        });
+        if (resp.ok) {
+            input.value = '';
+            forumCarregarComentarios(postId);
+            const countSpan = document.getElementById(`count-comentarios-${postId}`);
+            if (countSpan) countSpan.textContent = parseInt(countSpan.textContent || 0) + 1;
+        }
+    } catch (e) { console.error(e); alert('Erro de conexao.'); }
+}
+
+// Links do forum abrem em nova aba
+document.addEventListener('click', function(e) {
+    if (e.target.tagName === 'A' && e.target.closest('.forum-text')) {
+        e.target.setAttribute('target', '_blank');
+        e.target.setAttribute('rel', 'noopener noreferrer');
+    }
+});
+</script>

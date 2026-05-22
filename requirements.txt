@@ -1,0 +1,43 @@
+# Django
+Django>=5.1,<6.0
+gunicorn>=22.0
+uvicorn[standard]>=0.30
+
+# Database
+psycopg[binary]>=3.1
+
+# Cache / Queue
+redis>=5.0
+celery[redis]>=5.4
+django-celery-beat>=2.6
+
+# Auth (Clerk only)
+PyJWT>=2.8
+cryptography>=42.0
+
+# Storage
+django-storages[google]>=1.14
+google-cloud-storage>=2.16
+whitenoise>=6.7
+
+# LLM Integrations
+google-generativeai>=0.8
+google-cloud-aiplatform>=1.60
+anthropic>=0.34
+
+# Monitoring
+sentry-sdk[django,celery,redis]>=2.8
+
+# Payments
+stripe>=10.0
+
+# PDF Export / Processing
+weasyprint>=62.0
+PyMuPDF>=1.24
+
+# Utils
+python-dotenv>=1.0
+requests>=2.32
+
+# Dev
+django-silk>=5.1

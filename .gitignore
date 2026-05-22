@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual env
+venv/
+.venv/
+env/
+
+# Django
+*.sqlite3
+db.sqlite3
+/media/
+/staticfiles/
+/static/css/tailwind.css
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+package-lock.json
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+
+# Sentry
+.sentryclirc
+
+# Claude
+.claude/
+
+# Projeto antigo (referência, não subir)
+P-Jari_antigo/
+
+# Arquivos de teste/referência
+Consolidado_teste/
+Template_referencia*/

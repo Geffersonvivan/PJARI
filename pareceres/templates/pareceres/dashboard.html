@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}P-JARI — Estatísticas{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+
+  <!-- Header + Filtro de mês -->
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Minhas Estatísticas</h1>
+    <form method="get" class="flex items-center gap-2">
+      <input type="month" name="mes_ano" value="{{ mes_ano_input }}"
+             class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+             onchange="let [a,m]=this.value.split('-'); this.form.querySelector('[name=ano]').value=a; this.form.querySelector('[name=mes]').value=parseInt(m); this.form.submit();">
+      <input type="hidden" name="ano" value="{{ ano_selecionado }}">
+      <input type="hidden" name="mes" value="{{ mes_selecionado }}">
+    </form>
+  </div>
+
+  <!-- Cards principais -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <div class="text-sm text-gray-500">Total Julgados</div>
+      <div class="text-3xl font-bold text-gray-900 mt-1">{{ total_julgados }}</div>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <div class="text-sm text-gray-500">Tempo Poupado</div>
+      <div class="text-3xl font-bold text-brand-600 mt-1">{{ tempo_poupado_horas }}h</div>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <div class="text-sm text-gray-500">Taxa Deferimento</div>
+      <div class="text-3xl font-bold text-green-600 mt-1">{{ taxa_deferimento }}%</div>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <div class="text-sm text-gray-500">Blindagem Media</div>
+      <div class="text-3xl font-bold text-gray-900 mt-1">{{ score_medio }}%</div>
+    </div>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-6 mb-6">
+
+    <!-- Donut: Deferidos/Indeferidos -->
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <h3 class="font-semibold text-gray-800 mb-4">Resultado dos Pareceres</h3>
+      <div class="flex items-center justify-center gap-8">
+        <div class="text-center">
+          <div class="text-2xl font-bold text-green-600">{{ deferidos }}</div>
+          <div class="text-xs text-gray-500">Deferidos</div>
+        </div>
+        <div class="w-32 h-32 relative">
+          <svg viewBox="0 0 36 36" class="w-full h-full">
+            <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none" stroke="#e5e7eb" stroke-width="3"/>
+            <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none" stroke="#22c55e" stroke-width="3"
+                  stroke-dasharray="{{ taxa_deferimento }}, 100"/>
+          </svg>
+          <div class="absolute inset-0 flex items-center justify-center">
+            <span class="text-lg font-bold text-gray-700">{{ taxa_deferimento }}%</span>
+          </div>
+        </div>
+        <div class="text-center">
+          <div class="text-2xl font-bold text-red-500">{{ indeferidos }}</div>
+          <div class="text-xs text-gray-500">Indeferidos</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Créditos -->
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <h3 class="font-semibold text-gray-800 mb-4">Seus Creditos</h3>
+      <div class="text-center py-4">
+        <div class="text-4xl font-bold text-brand-600">{{ creditos }}</div>
+        <div class="text-sm text-gray-500 mt-1">creditos disponiveis</div>
+        {% if is_pro %}
+        <span class="inline-block mt-2 bg-brand-100 text-brand-700 text-xs px-3 py-1 rounded-full font-semibold">PRO</span>
+        {% endif %}
+        <div class="mt-4">
+          <a href="{% url 'planos' %}" class="text-sm text-brand-600 hover:text-brand-700 font-medium">Adquirir mais creditos</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Timeline -->
+  <div class="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+    <h3 class="font-semibold text-gray-800 mb-4">Pareceres por Dia</h3>
+    <div class="h-48 flex items-end gap-1">
+      {% for total in grafico_totais_list %}
+      <div class="flex-1 bg-brand-500 rounded-t transition-all hover:bg-brand-600"
+           style="height: {{ total|default:0 }}%; min-height: {% if total %}4px{% else %}1px{% endif %};"
+           title="{{ total }} pareceres"></div>
+      {% endfor %}
+    </div>
+    <div class="flex justify-between text-xs text-gray-400 mt-1">
+      <span>01</span>
+      <span>15</span>
+      <span>{{ ultimo_dia_mes|default:"31" }}</span>
+    </div>
+  </div>
+
+  <!-- Radar infrações -->
+  {% if radar_infracoes %}
+  <div class="bg-white rounded-xl border border-gray-200 p-5">
+    <h3 class="font-semibold text-gray-800 mb-4">Top 5 Infracoes</h3>
+    <div class="space-y-3">
+      {% for item in radar_infracoes %}
+      <div>
+        <div class="flex justify-between text-sm mb-1">
+          <span class="text-gray-700">{{ item.nome }}</span>
+          <span class="text-gray-500">{{ item.total }}</span>
+        </div>
+        <div class="w-full bg-gray-100 rounded-full h-2">
+          <div class="bg-brand-500 h-2 rounded-full" style="width: {{ item.pct }}%"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

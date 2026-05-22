@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Termos de Uso — P-JARI{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-3xl py-8 px-4">
+    <h1 class="text-2xl font-bold mb-6">Termos de Uso — P-JARI v{{ versao }}</h1>
+
+    <div class="prose mb-8 bg-white rounded-lg p-6 shadow">
+        <h2>1. Objeto</h2>
+        <p>O P-JARI é uma ferramenta de assessoria para julgadores da JARI/SC. Todas as decisões finais permanecem sob responsabilidade exclusiva do julgador.</p>
+
+        <h2>2. Responsabilidade</h2>
+        <p>O sistema auxilia na elaboração de pareceres, mas não substitui a análise e o julgamento humano. O julgador é integralmente responsável pelo conteúdo do parecer final.</p>
+
+        <h2>3. Dados e Privacidade</h2>
+        <p>Os dados processuais são armazenados de forma segura e utilizados exclusivamente para a geração de pareceres. Não há compartilhamento com terceiros.</p>
+
+        <h2>4. Uso de IA</h2>
+        <p>O sistema utiliza modelos de Inteligência Artificial para extração de dados e geração de textos. Os cálculos de prazos são determinísticos e não dependem de IA.</p>
+
+        <h2>5. Aceite</h2>
+        <p>Ao aceitar estes termos, o usuário declara estar ciente das condições acima e se compromete a utilizar o sistema de forma ética e responsável.</p>
+    </div>
+
+    {% if not ja_aceitou %}
+    <form method="post" action="{% url 'core:termos_aceitar' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700">
+            Aceitar Termos de Uso
+        </button>
+    </form>
+    {% else %}
+    <p class="text-green-700 font-medium">Termos aceitos.</p>
+    {% endif %}
+</div>
+{% endblock %}

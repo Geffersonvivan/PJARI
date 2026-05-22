@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}P-JARI — Painel Global{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+
+  <!-- Header + Filtro -->
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Painel Global</h1>
+    <form method="get" class="flex items-center gap-2">
+      <input type="month" name="mes_ano" value="{{ mes_ano_input }}"
+             class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+             onchange="let [a,m]=this.value.split('-'); this.form.querySelector('[name=ano]').value=a; this.form.querySelector('[name=mes]').value=parseInt(m); this.form.submit();">
+      <input type="hidden" name="ano" value="{{ ano_selecionado }}">
+      <input type="hidden" name="mes" value="{{ mes_selecionado }}">
+    </form>
+  </div>
+
+  <!-- Cards -->
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <div class="text-sm text-gray-500">Total Julgados</div>
+      <div class="text-3xl font-bold text-gray-900 mt-1">{{ total_julgados }}</div>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <div class="text-sm text-gray-500">Tempo Poupado</div>
+      <div class="text-3xl font-bold text-brand-600 mt-1">{{ tempo_poupado_horas }}h</div>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <div class="text-sm text-gray-500">Usuarios</div>
+      <div class="text-3xl font-bold text-gray-900 mt-1">{{ total_usuarios }}</div>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <div class="text-sm text-gray-500">Taxa Deferimento</div>
+      <div class="text-3xl font-bold text-green-600 mt-1">{{ taxa_deferimento }}%</div>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <div class="text-sm text-gray-500">Blindagem Media</div>
+      <div class="text-3xl font-bold text-gray-900 mt-1">{{ score_medio }}%</div>
+    </div>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-6 mb-6">
+
+    <!-- Donut -->
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <h3 class="font-semibold text-gray-800 mb-4">Resultado dos Pareceres</h3>
+      <div class="flex items-center justify-center gap-8">
+        <div class="text-center">
+          <div class="text-2xl font-bold text-green-600">{{ deferidos }}</div>
+          <div class="text-xs text-gray-500">Deferidos</div>
+        </div>
+        <div class="w-32 h-32 relative">
+          <svg viewBox="0 0 36 36" class="w-full h-full">
+            <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none" stroke="#e5e7eb" stroke-width="3"/>
+            <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none" stroke="#22c55e" stroke-width="3"
+                  stroke-dasharray="{{ taxa_deferimento }}, 100"/>
+          </svg>
+          <div class="absolute inset-0 flex items-center justify-center">
+            <span class="text-lg font-bold text-gray-700">{{ taxa_deferimento }}%</span>
+          </div>
+        </div>
+        <div class="text-center">
+          <div class="text-2xl font-bold text-red-500">{{ indeferidos }}</div>
+          <div class="text-xs text-gray-500">Indeferidos</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auditoria -->
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <h3 class="font-semibold text-gray-800 mb-4">Auditoria</h3>
+      <div class="space-y-3">
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Taxa de Interceptacao</span>
+          <span class="font-semibold text-gray-900">{{ taxa_interceptacao }}%</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Score Medio Blindagem</span>
+          <span class="font-semibold text-gray-900">{{ score_medio }}%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Uso de IA por Provider -->
+  <div class="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+    <h3 class="font-semibold text-gray-800 mb-4">Uso de IA por Provider</h3>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-gray-500 border-b">
+            <th class="pb-2 font-medium">Provider</th>
+            <th class="pb-2 font-medium">Chamadas</th>
+            <th class="pb-2 font-medium">Input Tokens</th>
+            <th class="pb-2 font-medium">Output Tokens</th>
+            <th class="pb-2 font-medium">Latencia Media</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for provider, data in tokens_por_provider.items %}
+          {% if data.count > 0 %}
+          <tr class="border-b border-gray-100">
+            <td class="py-2 font-medium text-gray-800 capitalize">{{ provider }}</td>
+            <td class="py-2 text-gray-600">{{ data.count }}</td>
+            <td class="py-2 text-gray-600">{{ data.input|floatformat:0 }}</td>
+            <td class="py-2 text-gray-600">{{ data.output|floatformat:0 }}</td>
+            <td class="py-2 text-gray-600">{{ data.avg_latency_ms }}ms</td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Timeline -->
+  <div class="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+    <h3 class="font-semibold text-gray-800 mb-4">Pareceres por Dia</h3>
+    <div class="h-48 flex items-end gap-1">
+      {% for total in grafico_totais_list %}
+      <div class="flex-1 bg-brand-500 rounded-t transition-all hover:bg-brand-600"
+           style="height: {{ total|default:0 }}%; min-height: {% if total %}4px{% else %}1px{% endif %};"
+           title="{{ total }} pareceres"></div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Erros recentes -->
+  {% if ultimos_erros %}
+  <div class="bg-white rounded-xl border border-gray-200 p-5">
+    <h3 class="font-semibold text-gray-800 mb-4">Erros Recentes</h3>
+    <div class="space-y-2 text-sm">
+      {% for erro in ultimos_erros %}
+      <div class="flex items-start gap-3 p-2 bg-red-50 rounded-lg">
+        <span class="text-xs text-red-400 whitespace-nowrap">{{ erro.timestamp|date:"d/m H:i" }}</span>
+        <span class="text-red-700">{{ erro.fase }}</span>
+        <span class="text-red-600 text-xs">{{ erro.dados }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

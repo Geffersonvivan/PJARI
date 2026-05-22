@@ -1,0 +1,35 @@
+# Projeto antigo (referência apenas)
+P-Jari_antigo/
+
+# Virtual environments
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Dev files
+.git/
+.gitignore
+*.md
+.env
+.env.*
+db.sqlite3
+
+# Media (uploads são em GCS)
+media/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (não usado no projeto novo)
+node_modules/
+
+# Claude
+.claude/
