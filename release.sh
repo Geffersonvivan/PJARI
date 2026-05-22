@@ -4,13 +4,13 @@ set -e
 # Release Command do Railway — roda UMA VEZ antes de qualquer réplica subir.
 
 echo "Collecting static files..."
-python manage.py collectstatic --noinput
+python3 manage.py collectstatic --noinput
 
 echo "Running migrations..."
-python manage.py migrate --noinput
+python3 manage.py migrate --noinput
 
 echo "Ensuring superuser..."
-python manage.py shell -c "
+python3 manage.py shell -c "
 import os
 from django.contrib.auth.models import User
 
