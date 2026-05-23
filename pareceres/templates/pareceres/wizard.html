@@ -690,8 +690,9 @@
   /* Wizard ocupa viewport sem scroll na página */
   html, body { height: 100%; margin: 0; overflow: hidden; }
   #wizard-root { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-  #wizard-content-area { flex: 1; min-height: 0; overflow: hidden; }
-  .wizard-step { height: 100%; overflow-y: auto; }
+  #wizard-content-area { flex: 1; min-height: 0; overflow: hidden; display: flex; }
+  #wizard-panel { min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+  .wizard-step { min-height: 0; overflow-y: auto; }
 </style>
 {% endblock %}
 
