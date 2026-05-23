@@ -51,7 +51,16 @@ def _check_item_1_cabecalho(processo, parecer_texto, texto_upper):
         falhas.append("Campo Relator ausente")
 
     ok = len(falhas) == 0
-    return ok, "Cabecalho completo" if ok else "Cabecalho: " + "; ".join(falhas)
+    if ok:
+        partes = []
+        if processo.recorrente:
+            partes.append(f"recorrente ({processo.recorrente})")
+        relator = processo.user.get_full_name() or processo.user.username
+        partes.append(f"relator ({relator.upper()})")
+        if processo.pa:
+            partes.append(f"numero do processo ({processo.pa})")
+        return True, "Nome do " + ", ".join(partes) + " estao corretamente identificados no parecer"
+    return False, "Cabecalho: " + "; ".join(falhas)
 
 
 def _check_item_2_resultado(processo, adm, parecer_texto, texto_upper):
@@ -85,7 +94,8 @@ def _check_item_2_resultado(processo, adm, parecer_texto, texto_upper):
         if not tem_indeferido and not tem_deferido:
             return False, "Resultado ausente no parecer"
 
-    return True, "Resultado coerente com flags e teses"
+    resultado = "DEFERIDO" if tem_deferido else "INDEFERIDO"
+    return True, f"O resultado {resultado} e coerente com as flags de admissibilidade e analise de teses"
 
 
 def _check_item_3_admissibilidade(adm, texto_upper):
@@ -105,7 +115,8 @@ def _check_item_3_admissibilidade(adm, texto_upper):
            re.search(r'INTEMPESTIVIDADE[^:]*NÃO\s+CONFIGURADA', texto_upper):
             return False, "Parecer diz intempestividade nao configurada, julgador definiu intempestivo"
 
-    return True, "Admissibilidade coerente com decisao do julgador"
+    status = "tempestivo" if flag else "intempestivo"
+    return True, f"O parecer declara corretamente o recurso como {status}, alinhado com a decisao do julgador"
 
 
 def _check_item_4_punitiva(adm, texto_upper):
@@ -129,7 +140,8 @@ def _check_item_4_punitiva(adm, texto_upper):
         if re.search(r'PRESCRI\w+\s+PUNITIVA[^.]*SIM', secao):
             return False, "Secao 3.1 conclui SIM mas julgador definiu NAO"
 
-    return True, "Prescricao punitiva coerente com julgador"
+    status = "SIM" if flag else "NAO"
+    return True, f"O parecer conclui corretamente pela {status} configuracao da prescricao punitiva, compativel com a Matematica Obrigatoria"
 
 
 def _check_item_5_intercorrente(adm, texto_upper):
@@ -145,7 +157,9 @@ def _check_item_5_intercorrente(adm, texto_upper):
     if not secao and (flag or flag_bienal):
         return False, "Secao 3.2/3.3 ausente — deveria constar prescricao intercorrente"
 
-    return True, "Prescricao intercorrente presente no parecer"
+    status_tri = "SIM" if flag else "NAO"
+    status_bi = "SIM" if flag_bienal else "NAO"
+    return True, f"Prescricao intercorrente trienal ({status_tri}) e bienal ({status_bi}) corretamente analisadas no parecer"
 
 
 def _check_item_6_decadencia(adm, texto_upper):
@@ -171,7 +185,8 @@ def _check_item_6_decadencia(adm, texto_upper):
     if flag and not tem_filtro:
         return False, "Decadencia SIM mas sem referencia ao filtro temporal / Res. 844"
 
-    return True, "Decadencia coerente com julgador e filtro temporal"
+    status = "SIM" if flag else "NAO"
+    return True, f"Decadencia ({status}) corretamente fundamentada com filtro temporal e referencias normativas"
 
 
 def _check_item_7_teses_rota_d(processo, adm, texto_upper):
@@ -191,7 +206,7 @@ def _check_item_7_teses_rota_d(processo, adm, texto_upper):
     if not tem_teses_secao:
         return False, "Rota D mas secao de teses ausente no parecer"
 
-    return True, f"Rota D — {len(teses)} tese(s) presente(s) no parecer"
+    return True, f"Rota D — {len(teses)} tese(s) defensiva(s) analisada(s) individualmente no parecer"
 
 
 def _check_item_8_teses_prejudicadas(adm, texto_upper):
@@ -213,7 +228,8 @@ def _check_item_8_teses_prejudicadas(adm, texto_upper):
     if not tem_prejudicada:
         return False, f"Rota {rota} mas parecer nao declara teses prejudicadas (deveria mencionar {razao})"
 
-    return True, f"Rota {rota} — teses prejudicadas declaradas"
+    razao_texto = razoes.get(rota, "materia de ordem publica")
+    return True, f"Rota {rota} — teses defensivas formalmente declaradas prejudicadas em razao de {razao_texto}"
 
 
 def _check_item_9_normatividade(texto_upper):
@@ -224,7 +240,7 @@ def _check_item_9_normatividade(texto_upper):
     if len(normas_encontradas) < 2:
         return False, "Poucas citacoes normativas encontradas (min. 2 esperadas)"
 
-    return True, f"Citacoes normativas presentes ({len(normas_encontradas)} tipos)"
+    return True, f"Citacoes normativas presentes e adequadas ({len(normas_encontradas)} categorias: {', '.join(normas_encontradas)})"
 
 
 def _check_item_10_vedacoes(parecer_texto, texto_upper):
@@ -242,7 +258,9 @@ def _check_item_10_vedacoes(parecer_texto, texto_upper):
         falhas.append("Contem emojis")
 
     ok = len(falhas) == 0
-    return ok, "Sem vedacoes" if ok else "Vedacoes: " + "; ".join(falhas)
+    if ok:
+        return True, "Nenhuma inovacao indevida detectada. Sem mencoes a motores de IA, fases internas ou emojis"
+    return False, "Vedacoes: " + "; ".join(falhas)
 
 
 def _extrair_secao(texto_upper, inicio, fim):
@@ -281,25 +299,25 @@ def execute(processo) -> ServiceResult:
     checklist = []
 
     checks = [
-        ("Cabecalho (PA, SGPE, Recorrente, Relator, Data)",
+        ("Identificacao Processual",
          lambda: _check_item_1_cabecalho(processo, parecer_texto, texto_upper)),
-        ("Resultado coerente com flags e teses",
+        ("Compatibilidade Logica entre Fundamentacao e Resultado",
          lambda: _check_item_2_resultado(processo, adm, parecer_texto, texto_upper)),
-        ("Admissibilidade coerente com julgador",
+        ("Tempestividade Narrativa",
          lambda: _check_item_3_admissibilidade(adm, texto_upper)),
-        ("Prescricao Punitiva coerente com julgador",
+        ("Prescricao Punitiva Aplicada",
          lambda: _check_item_4_punitiva(adm, texto_upper)),
-        ("Prescricao Intercorrente usa datas P1/P5",
+        ("Prescricao Intercorrente",
          lambda: _check_item_5_intercorrente(adm, texto_upper)),
-        ("Decadencia com filtro temporal correto",
+        ("Decadencia",
          lambda: _check_item_6_decadencia(adm, texto_upper)),
-        ("Teses analisadas individualmente (Rota D)",
+        ("Analise das Teses",
          lambda: _check_item_7_teses_rota_d(processo, adm, texto_upper)),
-        ("Teses prejudicadas declaradas (Rotas A/B/C)",
+        ("Teses Prejudicadas",
          lambda: _check_item_8_teses_prejudicadas(adm, texto_upper)),
-        ("Citacoes normativas presentes e hierarquizadas",
+        ("Citacao Normativa",
          lambda: _check_item_9_normatividade(texto_upper)),
-        ("Sem mencao a fases, emojis ou motores de IA",
+        ("Ausencia de Inovacao",
          lambda: _check_item_10_vedacoes(parecer_texto, texto_upper)),
     ]
 

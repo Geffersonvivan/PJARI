@@ -943,6 +943,12 @@
           if (editorFinal) editorFinal.value = data.texto;
         }
 
+        // Tempo de julgamento
+        var tempoEl = document.getElementById("tempo-julgamento");
+        if (tempoEl && data.tempo_julgamento) {
+          tempoEl.textContent = data.tempo_julgamento;
+        }
+
         // Selo de blindagem
         if (data.blindagem_score !== null && data.blindagem_score !== undefined) {
           var score = data.blindagem_score;
@@ -956,71 +962,79 @@
             if (score >= 80) {
               colorClass = "bg-green-50 border-green-200";
               iconClass = "ph ph-shield-check text-green-600";
-              statusText = score + "/100 — Aprovado";
+              statusText = score + "/100 \u00b7 Aprovado";
               pulseClass = "jari-pulse-green";
             } else if (score >= 50) {
               colorClass = "bg-yellow-50 border-yellow-200";
               iconClass = "ph ph-shield-warning text-yellow-600";
-              statusText = score + "/100 — Atencao";
+              statusText = score + "/100 \u00b7 Aten\u00e7\u00e3o";
               pulseClass = "jari-pulse-yellow";
             } else {
               colorClass = "bg-red-50 border-red-200";
               iconClass = "ph ph-x-circle text-red-600";
-              statusText = score + "/100 — Score baixo";
+              statusText = score + "/100 \u00b7 Reprovado";
               pulseClass = "jari-pulse-red";
             }
-            selo.className = "flex items-center gap-3 rounded-xl px-5 py-3 border mb-2 " + colorClass + " " + pulseClass;
-            icon.className = iconClass + " text-2xl";
+            selo.className = "flex-1 flex items-center gap-3 rounded-xl px-5 py-3 border cursor-pointer select-none transition-all " + colorClass + " " + pulseClass;
+            icon.className = iconClass;
+            icon.style.fontSize = "26px";
             label.textContent = statusText;
           }
         }
 
-        // Detalhes da blindagem
-        if (data.blindagem_detalhes) {
-          renderMarkdown(document.getElementById("blindagem-detalhes"), data.blindagem_detalhes);
+        // Info do processo no checklist
+        var infoEl = document.getElementById("audit-processo-info");
+        if (infoEl) {
+          var parts = [];
+          if (data.pa) parts.push("<strong>Processo:</strong> " + escapeHtml(data.pa));
+          if (data.recorrente) parts.push("<strong>Recorrente:</strong> " + escapeHtml(data.recorrente));
+          if (data.relator) parts.push("<strong>Relator:</strong> " + escapeHtml(data.relator));
+          infoEl.innerHTML = parts.join(" &nbsp;|&nbsp; ");
         }
 
-        // Checklist de auditoria
-        if (data.checklist && Array.isArray(data.checklist)) {
-          var wrap = document.getElementById("audit-checklist-wrap");
+        // Checklist de auditoria (itens detalhados)
+        var checklist = data.checklist;
+        if (checklist && Array.isArray(checklist) && checklist.length > 0) {
           var container = document.getElementById("audit-checklist");
-          if (wrap && container && data.checklist.length > 0) {
-            wrap.style.display = "";
+          if (container) {
             var html = "";
-            data.checklist.forEach(function(item) {
+            var itensOk = 0;
+            checklist.forEach(function(item, idx) {
               var ok = item.ok || item.passed || item.status === true;
-              var iconCls = ok ? "ph ph-check-circle audit-icon-ok" : "ph ph-x-circle audit-icon-fail";
-              var label = item.label || item.descricao || item.name || "";
-              html += '<div class="audit-item">';
-              html += '  <i class="' + iconCls + ' text-lg"></i>';
-              html += '  <span class="flex-1 text-gray-700">' + escapeHtml(label) + '</span>';
-              if (ok) html += '  <span class="text-xs text-green-600 font-medium">OK</span>';
-              else html += '  <span class="text-xs text-red-600 font-medium">FALHA</span>';
+              if (ok) itensOk++;
+              var dotClass = ok ? "bg-green-500" : "bg-red-500";
+              var statusLabel = ok ? "Conforme" : "N\u00e3o conforme";
+              var statusColor = ok ? "text-green-700" : "text-red-700";
+              var itemLabel = item.label || item.descricao || item.name || "";
+              var detalhe = item.detalhe || "";
+
+              html += '<div>';
+              html += '<p class="text-sm text-gray-800 leading-relaxed">';
+              html += '<strong class="text-gray-900">' + (idx + 1) + '. ' + escapeHtml(itemLabel) + ':</strong> ';
+              html += '<span class="inline-flex items-center gap-1 mx-1">';
+              html += '<span class="w-2.5 h-2.5 rounded-full inline-block ' + dotClass + '"></span>';
+              html += '<span class="font-medium ' + statusColor + '">' + statusLabel + '</span>';
+              html += '</span>';
+              if (detalhe) html += ' \u2014 ' + escapeHtml(detalhe);
+              html += '</p>';
               html += '</div>';
             });
             container.innerHTML = html;
-          }
-        } else if (data.checklist && typeof data.checklist === "object") {
-          // Checklist como objeto {key: bool}
-          var wrap = document.getElementById("audit-checklist-wrap");
-          var container = document.getElementById("audit-checklist");
-          if (wrap && container) {
-            var keys = Object.keys(data.checklist);
-            if (keys.length > 0) {
-              wrap.style.display = "";
-              var html = "";
-              keys.forEach(function(k) {
-                var ok = data.checklist[k];
-                var iconCls = ok ? "ph ph-check-circle audit-icon-ok" : "ph ph-x-circle audit-icon-fail";
-                var label = k.replace(/_/g, " ").replace(/\b\w/g, function(c){ return c.toUpperCase(); });
-                html += '<div class="audit-item">';
-                html += '  <i class="' + iconCls + ' text-lg"></i>';
-                html += '  <span class="flex-1 text-gray-700">' + escapeHtml(label) + '</span>';
-                if (ok) html += '  <span class="text-xs text-green-600 font-medium">OK</span>';
-                else html += '  <span class="text-xs text-red-600 font-medium">FALHA</span>';
-                html += '</div>';
-              });
-              container.innerHTML = html;
+
+            // Resultado final
+            var resultDiv = document.getElementById("audit-resultado-final");
+            if (resultDiv) {
+              resultDiv.classList.remove("hidden");
+              var total = checklist.length;
+              if (itensOk === total) {
+                resultDiv.className = "mt-8 rounded-xl bg-green-50 border border-green-200 px-5 py-4";
+                resultDiv.innerHTML = '<p class="text-sm font-bold text-green-800 italic">' +
+                  '"\u2705 RESULTADO FINAL DA AUDITORIA: APROVADO SEM RESSALVAS \u2014 ' + total + '/' + total + ' ITENS CONFORMES"</p>';
+              } else {
+                resultDiv.className = "mt-8 rounded-xl bg-red-50 border border-red-200 px-5 py-4";
+                resultDiv.innerHTML = '<p class="text-sm font-bold text-red-800 italic">' +
+                  '"\u26a0\ufe0f RESULTADO FINAL DA AUDITORIA: ' + itensOk + '/' + total + ' ITENS CONFORMES \u2014 REQUER REVIS\u00c3O"</p>';
+              }
             }
           }
         }

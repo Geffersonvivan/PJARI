@@ -614,6 +614,15 @@ def api_parecer_dados(request, pk):
     except Parecer.DoesNotExist:
         return JsonResponse({"error": "Parecer não disponível."}, status=404)
 
+    # Tempo de julgamento
+    tempo_str = ""
+    try:
+        diff = (parecer.created_at - processo.created_at).total_seconds()
+        m, s = divmod(int(diff), 60)
+        tempo_str = f"{m} min {s:02d} s"
+    except Exception:
+        pass
+
     return JsonResponse({
         "texto": parecer.conteudo_final,
         "texto_ia": parecer.texto_ia,
@@ -623,6 +632,10 @@ def api_parecer_dados(request, pk):
         "blindagem_score": parecer.blindagem_score,
         "blindagem_detalhes": parecer.blindagem_detalhes,
         "checklist": parecer.checklist_auditoria,
+        "tempo_julgamento": tempo_str,
+        "recorrente": processo.recorrente or "",
+        "relator": processo.user.get_full_name() or processo.user.username,
+        "pa": processo.pa or "",
     })
 
 

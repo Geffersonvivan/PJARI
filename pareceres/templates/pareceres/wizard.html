@@ -485,43 +485,43 @@
 
     <!-- PASSO 6: Finalizar -->
     <div class="wizard-step flex-1 {% if passo_atual != 6 %}hidden{% endif %}" data-step="6">
-      <div class="max-w-3xl mx-auto">
+      <div class="max-w-4xl mx-auto">
 
-        <!-- Success header -->
-        <div class="text-center mb-6">
-          <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <i class="ph ph-check-circle text-green-600" style="font-size:32px;"></i>
-          </div>
-          <h2 class="text-xl font-bold text-gray-900 mb-2">Processo Finalizado</h2>
-          <p class="text-gray-500 text-sm">O parecer foi auditado e salvo com sucesso.</p>
-        </div>
-
-        <!-- Selo de conformidade (blindagem) -->
-        <div id="blindagem-card" class="mb-6">
-          <div id="blindagem-selo" class="flex items-center gap-3 rounded-xl px-5 py-3 border mb-2" style="display:none;">
-            <i id="blindagem-icon" class="text-2xl"></i>
+        <!-- ── Header: JariMatch + Tempo ── -->
+        <div class="flex items-stretch gap-4 mb-6">
+          <!-- Selo JariMatch (clicável, expande checklist) -->
+          <div id="blindagem-selo" class="flex-1 flex items-center gap-3 rounded-xl px-5 py-3 border cursor-pointer select-none transition-all bg-gray-50 border-gray-200" style="display:none;"
+               onclick="var w=document.getElementById('audit-checklist-wrap');w.classList.toggle('hidden');var a=document.getElementById('blindagem-arrow');a.style.transform=a.style.transform?'':'rotate(180deg)';">
+            <i id="blindagem-icon" style="font-size:26px;"></i>
             <div class="flex-1">
               <span class="block text-xs font-medium text-gray-500">JariMatch — Blindagem normativa</span>
               <span id="blindagem-label" class="block text-sm font-bold"></span>
             </div>
-            <button type="button" id="blindagem-toggle" class="p-1 text-gray-400 hover:text-gray-600" onclick="document.getElementById('blindagem-detalhes').classList.toggle('hidden');var a=document.getElementById('blindagem-arrow');a.style.transform=a.style.transform?'':'rotate(180deg)';">
-              <i id="blindagem-arrow" class="ph ph-caret-down" style="transition:transform .2s;"></i>
-            </button>
+            <i id="blindagem-arrow" class="ph ph-caret-down text-gray-400" style="font-size:16px;transition:transform .2s;"></i>
           </div>
-          <!-- Detalhes expandíveis -->
-          <div id="blindagem-detalhes" class="hidden rounded-xl border border-gray-200 bg-gray-50 p-4 prose-jari text-sm mb-4"></div>
+          <!-- Tempo de julgamento -->
+          <div class="flex items-center gap-3 rounded-xl px-5 py-3 border border-gray-200 bg-white min-w-[180px]">
+            <i class="ph ph-clock text-gray-400" style="font-size:22px;"></i>
+            <div>
+              <span class="block text-xs text-gray-400">Tempo de julgamento</span>
+              <span id="tempo-julgamento" class="block text-sm font-bold text-gray-800">—</span>
+            </div>
+          </div>
         </div>
 
-        <!-- Checklist de auditoria -->
-        <div id="audit-checklist-wrap" class="mb-6 rounded-xl border border-gray-200 overflow-hidden" style="display:none;">
-          <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center gap-2">
-            <i class="ph ph-list-checks text-blue-600"></i>
-            <span class="text-sm font-semibold text-gray-700">Checklist de Auditoria</span>
+        <!-- ── Checklist de auditoria (colapsado por padrão) ── -->
+        <div id="audit-checklist-wrap" class="hidden mb-6">
+          <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+            <h2 class="text-lg font-bold text-gray-900 mb-1">&#x1F399; Auditoria Final de Conformidade</h2>
+            <h3 class="text-sm font-bold text-gray-500 mb-5">&#x1F50D; AUDITORIA CORRECIONAL — CHECKLIST DE CONFORMIDADE</h3>
+            <p class="text-sm text-gray-600 mb-6" id="audit-processo-info"></p>
+            <div id="audit-checklist" class="space-y-5"></div>
+            <!-- Resultado final -->
+            <div id="audit-resultado-final" class="mt-8 rounded-xl px-5 py-4 hidden"></div>
           </div>
-          <div id="audit-checklist" class="bg-white"></div>
         </div>
 
-        <!-- Parecer final (visível + copiar + editar) -->
+        <!-- ── Parecer final (visível + copiar + editar) ── -->
         <div class="mb-6">
           <div class="flex items-center justify-between mb-3">
             <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
