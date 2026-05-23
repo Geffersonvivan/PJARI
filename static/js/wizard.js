@@ -151,23 +151,32 @@
             }
 
             // Simular progresso enquanto extrai
-            let pct = 1;
+            let pct = 5;
             const progressBar = document.getElementById("doc-progress-bar");
             const progressPct = document.getElementById("doc-progress-pct");
             const progressMsg = document.getElementById("doc-progress-msg");
             const messages = [
-              [10, "ENVIANDO DOCUMENTO..."],
-              [25, "EXTRAINDO TEXTO DO PDF..."],
-              [45, "IDENTIFICANDO DATAS..."],
-              [65, "VERIFICANDO PRAZOS..."],
-              [80, "ANALISANDO CAMPOS..."],
+              [5,  "ENVIANDO DOCUMENTO..."],
+              [20, "EXTRAINDO TEXTO DO PDF..."],
+              [40, "IDENTIFICANDO DATAS..."],
+              [60, "VERIFICANDO PRAZOS..."],
+              [78, "ANALISANDO CAMPOS..."],
               [90, "FINALIZANDO EXTRACAO..."],
             ];
             let msgIdx = 0;
+            // Inicializar barra imediatamente
+            progressBar.style.width = "5%";
+            progressPct.textContent = "5%";
+            progressMsg.textContent = messages[0][1];
+            msgIdx = 1;
 
             const progressInterval = setInterval(() => {
               if (pct < 95) {
-                pct += Math.random() * 3 + 0.5;
+                // Incremento maior no início, desacelera ao final
+                var step = pct < 30 ? (Math.random() * 5 + 3) :
+                           pct < 70 ? (Math.random() * 3 + 1.5) :
+                                      (Math.random() * 1.5 + 0.3);
+                pct += step;
                 if (pct > 95) pct = 95;
                 progressBar.style.width = Math.floor(pct) + "%";
                 progressPct.textContent = Math.floor(pct) + "%";
@@ -176,7 +185,7 @@
                   msgIdx++;
                 }
               }
-            }, 800);
+            }, 600);
 
             pollTask(data.task_id, () => {
               clearInterval(progressInterval);
