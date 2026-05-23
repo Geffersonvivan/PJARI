@@ -2,6 +2,7 @@
 {% load static pareceres_tags %}
 {% block title %}P-JARI — Processo {{ processo.recorrente|default:"Novo" }}{% endblock %}
 
+{% block navbar %}{% endblock %}
 {% block sub_nav %}{% endblock %}
 
 {% block content %}
@@ -685,6 +686,11 @@
   }
   .btn-colar-data:hover { color: #2563eb; background: #eff6ff; }
   .btn-colar-data.ok { color: #16a34a; }
+
+  /* Wizard ocupa 100vh sem scroll na página */
+  html, body { height: 100%; overflow: hidden; }
+  #wizard-root { height: 100vh; overflow: hidden; }
+  .wizard-step { overflow-y: auto; }
 </style>
 {% endblock %}
 

@@ -124,6 +124,7 @@
 {% csrf_token %}
 
 <!-- ══ NAVBAR ════════════════════════════════════ -->
+{% block navbar %}
 <nav class="bg-white border-b border-gray-100 sticky top-0 z-50">
   <div class="w-full flex items-center justify-between" style="height:60px;padding-left:50px;padding-right:50px;">
     <div class="flex items-center gap-4">
@@ -241,6 +242,7 @@
     </div>
   </div>
 </nav>
+{% endblock navbar %}
 
 {% block sub_nav %}{% endblock %}
 
