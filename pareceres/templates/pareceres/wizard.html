@@ -687,10 +687,11 @@
   .btn-colar-data:hover { color: #2563eb; background: #eff6ff; }
   .btn-colar-data.ok { color: #16a34a; }
 
-  /* Wizard ocupa 100vh sem scroll na página */
-  html, body { height: 100%; overflow: hidden; }
-  #wizard-root { height: 100vh; overflow: hidden; }
-  .wizard-step { overflow-y: auto; }
+  /* Wizard ocupa viewport sem scroll na página */
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  #wizard-root { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+  #wizard-content-area { flex: 1; min-height: 0; overflow: hidden; }
+  .wizard-step { height: 100%; overflow-y: auto; }
 </style>
 {% endblock %}
 
