@@ -9,8 +9,8 @@ python3 manage.py collectstatic --noinput 2>/dev/null || true
 
 # Celery workers em background (compartilham volume /app/media)
 echo "Starting Celery workers in background..."
-celery -A config worker --loglevel=info --concurrency=${CELERY_FAST_CONCURRENCY:-4} --queues=fast --max-tasks-per-child=100 &
-celery -A config worker --loglevel=info --concurrency=${CELERY_HEAVY_CONCURRENCY:-2} --queues=heavy --max-tasks-per-child=20 &
+celery -A config worker --loglevel=info --concurrency=${CELERY_FAST_CONCURRENCY:-4} --queues=fast --max-tasks-per-child=100 -f /dev/stderr &
+celery -A config worker --loglevel=info --concurrency=${CELERY_HEAVY_CONCURRENCY:-2} --queues=heavy --max-tasks-per-child=20 -f /dev/stderr &
 
 echo "Starting gunicorn ASGI (uvicorn worker)..."
 exec gunicorn config.asgi:application \
