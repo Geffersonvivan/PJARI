@@ -3,12 +3,13 @@ Service Fase 2 — Extração de dados do PDF consolidado via LLM.
 
 Extrai nome do recorrente, tipo de penalidade, datas do processo.
 
-Provider: Anthropic (PDF→JPEG→Claude)
+Provider: Gemini (upload PDF nativo) com fallback Anthropic (PDF→JPEG→Claude)
 """
 
 import datetime
 import logging
 import re
+import time
 
 from pareceres.estado import FaseProcesso
 from pareceres.models import Admissibilidade, log_audit
@@ -104,8 +105,46 @@ def _salvar_campos(processo, adm, texto_resposta: str):
 # ── Providers ────────────────────────────────────────────────────────────────
 
 
+def _tentar_gemini(processo, docs_dict: dict) -> str | None:
+    """Tenta extração via Gemini (upload PDF nativo)."""
+    try:
+        from pareceres.integrations.gemini import GeminiClient
+        gemini = GeminiClient()
+        if not gemini.client:
+            _log.warning("[DOCUMENTOS] Gemini sem API key configurada")
+            return None
+
+        consolidado_path = docs_dict.get("consolidado")
+        if not consolidado_path:
+            return None
+
+        _log.info("[DOCUMENTOS] Gemini upload PDF processo=%s", processo.id)
+        start = time.time()
+        uploaded = gemini.upload_file(consolidado_path)
+        if not uploaded:
+            _log.error("[DOCUMENTOS] Gemini upload falhou processo=%s", processo.id)
+            return None
+
+        _log.info("[DOCUMENTOS] Gemini generate processo=%s", processo.id)
+        response, model_used = gemini.generate(
+            model="gemini-2.0-flash",
+            contents=[uploaded, PROMPT_EXTRACAO_F2],
+            config={"temperature": 0.1, "max_output_tokens": 1024},
+        )
+
+        texto = response.text if response else None
+        gemini.log_usage(processo, response, "Extração F2", model_used, start)
+
+        if texto:
+            _log.info("[DOCUMENTOS] Gemini OK processo=%s modelo=%s", processo.id, model_used)
+        return texto
+    except Exception as e:
+        _log.error("[DOCUMENTOS] Gemini falhou: %s", e, exc_info=True)
+        return None
+
+
 def _tentar_anthropic(processo, docs_dict: dict) -> str | None:
-    """Tenta extração via Anthropic (PDF→JPEG→Claude)."""
+    """Tenta extração via Anthropic (PDF→JPEG→Claude) — fallback."""
     try:
         from pareceres.integrations.anthropic import AnthropicClient
         client = AnthropicClient()
@@ -135,9 +174,14 @@ def execute(processo) -> ServiceResult:
 
     docs_dict = {tipo: d.arquivo.name for tipo, d in docs.items() if d.arquivo}
 
-    # Extração via Anthropic (Claude)
-    texto_resposta = _tentar_anthropic(processo, docs_dict)
-    provider = "Anthropic"
+    # Extração via Gemini (PDF nativo) → fallback Anthropic
+    texto_resposta = _tentar_gemini(processo, docs_dict)
+    provider = "Gemini"
+
+    if not texto_resposta:
+        _log.info("[DOCUMENTOS] Gemini indisponível, tentando Anthropic processo=%s", processo.id)
+        texto_resposta = _tentar_anthropic(processo, docs_dict)
+        provider = "Anthropic"
 
     if not texto_resposta:
         return ServiceResult.falha(
@@ -145,7 +189,8 @@ def execute(processo) -> ServiceResult:
             "Verifique se os arquivos são PDFs válidos."
         )
 
-    _log.info("[DOCUMENTOS] Resposta LLM processo=%s:\n%s", processo.id, texto_resposta[:1000])
+    _log.info("[DOCUMENTOS] Resposta LLM processo=%s provider=%s:\n%s",
+              processo.id, provider, texto_resposta[:1000])
 
     # Parse e salvar campos
     _salvar_campos(processo, adm, texto_resposta)
