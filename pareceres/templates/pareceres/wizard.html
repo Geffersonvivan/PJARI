@@ -682,9 +682,9 @@
   var firstTab = document.querySelector('.pdf-tab');
   if (firstTab) switchPdfTab(firstTab);
 
-  // Esconder sidebar nos passos 5 e 6 (PDF não é necessário)
+  // Esconder sidebar nos passos 3+ (PDF só é útil no passo 2)
   var _passo = parseInt('{{ passo_atual }}', 10);
-  if (_passo >= 5) hidePdfSidebar();
+  if (_passo >= 3) hidePdfSidebar();
 })();
 </script>
 {% endblock %}

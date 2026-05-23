@@ -300,6 +300,7 @@
       };
 
       showLoading("dados-loading");
+      if (typeof hidePdfSidebar === "function") hidePdfSidebar();
 
       api(urls.confirmarDados, { method: "POST", body: JSON.stringify(body) })
         .then(function(data) {
