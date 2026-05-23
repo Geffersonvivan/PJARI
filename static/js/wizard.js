@@ -265,6 +265,12 @@
         setExtractedDateField("data-protocolo", data.data_protocolo);
         setExtractedField("paginas-defesa", data.paginas_defesa);
 
+        // Datas extraídas do PDF
+        setExtractedDateField("data-infracao", data.data_infracao);
+        setExtractedDateField("data-na", data.data_na);
+        setExtractedDateField("data-np", data.data_np);
+        setExtractedDateField("data-instauracao", data.data_instauracao);
+
         // Data sessão (se já existir)
         if (data.data_sessao) {
           var ds = document.querySelector('[name="data_sessao"]');
@@ -297,6 +303,10 @@
         prazo_final: document.getElementById("field-prazo-final").value,
         data_protocolo: document.getElementById("field-data-protocolo").value,
         paginas_defesa: document.getElementById("field-paginas-defesa").value,
+        data_infracao: document.getElementById("field-data-infracao").value,
+        data_na: document.getElementById("field-data-na").value,
+        data_np: document.getElementById("field-data-np").value,
+        data_instauracao: document.getElementById("field-data-instauracao").value,
       };
 
       showLoading("dados-loading");
