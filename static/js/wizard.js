@@ -297,13 +297,31 @@
     formDados.addEventListener("submit", function(e) {
       e.preventDefault();
 
+      // Validar campo obrigatório: data_infracao
+      var dataInfracaoField = document.getElementById("field-data-infracao");
+      if (!dataInfracaoField.value) {
+        dataInfracaoField.classList.add("border-red-400", "ring-2", "ring-red-200");
+        dataInfracaoField.focus();
+        var msg = dataInfracaoField.closest("div").parentElement.querySelector(".field-error-msg");
+        if (!msg) {
+          msg = document.createElement("p");
+          msg.className = "field-error-msg text-xs text-red-500 mt-1 font-medium";
+          msg.textContent = "Preencha a data da infracao consultando o PDF ao lado.";
+          dataInfracaoField.closest("div").parentElement.appendChild(msg);
+        }
+        return;
+      }
+      dataInfracaoField.classList.remove("border-red-400", "ring-2", "ring-red-200");
+      var errMsg = dataInfracaoField.closest("div").parentElement.querySelector(".field-error-msg");
+      if (errMsg) errMsg.remove();
+
       var body = {
         data_sessao: formDados.querySelector('[name="data_sessao"]').value,
         recorrente: document.getElementById("field-recorrente").value,
         prazo_final: document.getElementById("field-prazo-final").value,
         data_protocolo: document.getElementById("field-data-protocolo").value,
         paginas_defesa: document.getElementById("field-paginas-defesa").value,
-        data_infracao: document.getElementById("field-data-infracao").value,
+        data_infracao: dataInfracaoField.value,
         data_na: document.getElementById("field-data-na").value,
         data_np: document.getElementById("field-data-np").value,
         data_instauracao: document.getElementById("field-data-instauracao").value,

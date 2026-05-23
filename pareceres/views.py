@@ -290,8 +290,13 @@ def api_confirmar_dados(request, pk):
     from .models import Admissibilidade
     adm, _ = Admissibilidade.objects.get_or_create(processo=processo)
 
-    if body.get("data_infracao", "").strip():
-        adm.data_infracao = _parse(body["data_infracao"])
+    # Data da infração é obrigatória para o cálculo de admissibilidade
+    data_infracao_str = body.get("data_infracao", "").strip()
+    if not data_infracao_str and not adm.data_infracao:
+        return JsonResponse({"error": "Data da Infração é obrigatória. Consulte o PDF e preencha."}, status=400)
+
+    if data_infracao_str:
+        adm.data_infracao = _parse(data_infracao_str)
     if body.get("data_na", "").strip():
         adm.data_na = _parse(body["data_na"])
     if body.get("data_np", "").strip():
