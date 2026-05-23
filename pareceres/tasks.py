@@ -119,10 +119,17 @@ def auditar_parecer_task(self, processo_id):
     """Fase 6: Auditoria/blindagem."""
     from pareceres.services.service_auditoria import execute
 
+    _log.info("[TASK] auditar_parecer RECEBIDA processo=%s retry=%s",
+              processo_id, self.request.retries)
     try:
         processo = _get_processo(processo_id)
+        _log.info("[TASK] auditar_parecer fase_atual=%s processo=%s",
+                  processo.fase, processo_id)
         result = execute(processo)
+        _log.info("[TASK] auditar_parecer resultado ok=%s processo=%s erro=%s",
+                  result.ok, processo_id, getattr(result, 'erro', None))
         return _handle_result(result, self, processo_id)
     except Exception as exc:
-        _log.error("[TASK] auditar_parecer erro: %s — processo=%s", exc, processo_id)
+        _log.error("[TASK] auditar_parecer erro: %s — processo=%s", exc, processo_id,
+                   exc_info=True)
         raise self.retry(exc=exc, countdown=20 * (self.request.retries + 1))

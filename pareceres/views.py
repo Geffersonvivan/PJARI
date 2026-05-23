@@ -628,6 +628,10 @@ def api_parecer_dados(request, pk):
     except Exception:
         pass
 
+    _log.info("[PARECER_DADOS] processo=%s blindagem_score=%s checklist_len=%s",
+              processo.id, parecer.blindagem_score,
+              len(parecer.checklist_auditoria) if parecer.checklist_auditoria else 0)
+
     return JsonResponse({
         "texto": parecer.conteudo_final,
         "texto_ia": parecer.texto_ia,
@@ -706,19 +710,24 @@ def api_auditoria_finalizar(request, pk):
         processo.save(update_fields=["fase"])
 
     from .tasks import auditar_parecer_task
+    _log.info("[AUDITORIA] Disparando task processo=%s fase=%s", processo.id, processo.fase)
     try:
         task = auditar_parecer_task.delay(processo.id)
+        _log.info("[AUDITORIA] Task enviada task_id=%s processo=%s", task.id, processo.id)
         return JsonResponse({"ok": True, "task_id": task.id})
-    except Exception:
-        _log.info("[AUDITORIA] Sem broker — fallback síncrono processo=%s", processo.id)
+    except Exception as exc:
+        _log.warning("[AUDITORIA] Sem broker — fallback síncrono processo=%s erro=%s",
+                     processo.id, exc)
         try:
             from .services.service_auditoria import execute
             result = execute(processo)
+            _log.info("[AUDITORIA] Fallback resultado ok=%s processo=%s", result.ok, processo.id)
             if not result.ok:
                 _log.error("[AUDITORIA] Falha síncrona: %s — processo=%s", result.erro, processo.id)
                 return JsonResponse({"error": result.erro}, status=400)
         except Exception as e:
-            _log.error("[AUDITORIA] Erro síncrono: %s", e)
+            _log.error("[AUDITORIA] Erro síncrono: %s — processo=%s", e, processo.id,
+                       exc_info=True)
             return JsonResponse({"error": "Erro interno na auditoria."}, status=500)
         return JsonResponse({"ok": True, "task_id": "sync"})
 
