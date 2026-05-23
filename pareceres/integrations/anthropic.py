@@ -157,13 +157,15 @@ class AnthropicClient:
             path = docs_dict.get(tipo)
             if not path:
                 continue
+            _log.info("[ANTHROPIC] Convertendo PDF tipo=%s path=%s", tipo, path)
             images = self.pdf_to_images(path)
+            _log.info("[ANTHROPIC] PDF tipo=%s -> %d imagens", tipo, len(images))
             if images:
                 content.append({"type": "text", "text": f"--- {tipo.upper()} ---"})
                 content.extend(images)
 
         if not content:
-            _log.warning("[ANTHROPIC] Nenhuma imagem extraída dos PDFs")
+            _log.warning("[ANTHROPIC] Nenhuma imagem extraída dos PDFs — docs_dict=%s", docs_dict)
             return None
 
         content.append({"type": "text", "text": prompt})
