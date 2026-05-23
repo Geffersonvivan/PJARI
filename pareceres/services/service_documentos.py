@@ -61,6 +61,11 @@ def _salvar_campos(processo, adm, texto_resposta: str):
     data_np = _extrair_campo(texto_resposta, "DATA_NP")
     data_instauracao = _extrair_campo(texto_resposta, "DATA_INSTAURACAO")
 
+    _log.info("[DOCUMENTOS] Campos extraidos processo=%s: recorrente=%r tipo=%r infracao=%r "
+              "data_infracao=%r data_na=%r data_np=%r data_inst=%r",
+              processo.id, recorrente, tipo_penalidade, infracao_doc,
+              data_infracao, data_na, data_np, data_instauracao)
+
     _nulos = {"nulo", "null", "none", "n/a", "não encontrado", "nao encontrado",
               "não localizado", "nao localizado", "nao_se_aplica", "nao_encontrado", ""}
 
@@ -139,6 +144,8 @@ def execute(processo) -> ServiceResult:
             "Não foi possível processar nenhum documento. "
             "Verifique se os arquivos são PDFs válidos."
         )
+
+    _log.info("[DOCUMENTOS] Resposta LLM processo=%s:\n%s", processo.id, texto_resposta[:1000])
 
     # Parse e salvar campos
     _salvar_campos(processo, adm, texto_resposta)
