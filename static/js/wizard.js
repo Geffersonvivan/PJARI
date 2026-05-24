@@ -997,6 +997,7 @@
   function loadFinalizado() {
     api(urls.parecerDados)
       .then(function(data) {
+        console.log("[JARI] loadFinalizado data:", JSON.stringify({blindagem_score: data.blindagem_score, checklist: data.checklist ? data.checklist.length : 0}));
         // Parecer final (sem cabeçalho na exibição)
         if (data.texto) {
           parecerTextoOriginal = data.texto;
@@ -1013,37 +1014,41 @@
           tempoEl.textContent = data.tempo_julgamento;
         }
 
-        // Selo de blindagem
-        if (data.blindagem_score !== null && data.blindagem_score !== undefined) {
-          var score = data.blindagem_score;
-          var selo = document.getElementById("blindagem-selo");
-          var icon = document.getElementById("blindagem-icon");
-          var label = document.getElementById("blindagem-label");
+        // Selo de blindagem (sempre visível no passo 6)
+        var selo = document.getElementById("blindagem-selo");
+        var icon = document.getElementById("blindagem-icon");
+        var label = document.getElementById("blindagem-label");
 
-          if (selo) {
-            selo.style.display = "";
-            var colorClass, iconClass, statusText, pulseClass;
-            if (score >= 80) {
-              colorClass = "bg-green-50 border-green-200";
-              iconClass = "ph ph-shield-check text-green-600";
-              statusText = score + "/100 \u00b7 Aprovado";
-              pulseClass = "jari-pulse-green";
-            } else if (score >= 50) {
-              colorClass = "bg-yellow-50 border-yellow-200";
-              iconClass = "ph ph-shield-warning text-yellow-600";
-              statusText = score + "/100 \u00b7 Aten\u00e7\u00e3o";
-              pulseClass = "jari-pulse-yellow";
-            } else {
-              colorClass = "bg-red-50 border-red-200";
-              iconClass = "ph ph-x-circle text-red-600";
-              statusText = score + "/100 \u00b7 Reprovado";
-              pulseClass = "jari-pulse-red";
-            }
-            selo.className = "flex-1 flex items-center gap-3 rounded-xl px-5 py-3 border cursor-pointer select-none transition-all " + colorClass + " " + pulseClass;
-            icon.className = iconClass;
-            icon.style.fontSize = "26px";
-            label.textContent = statusText;
+        if (selo) {
+          selo.style.display = "";
+          var score = data.blindagem_score;
+          var colorClass, iconClass, statusText, pulseClass;
+
+          if (score === null || score === undefined) {
+            colorClass = "bg-gray-50 border-gray-300";
+            iconClass = "ph ph-shield text-gray-400";
+            statusText = "Auditoria pendente";
+            pulseClass = "";
+          } else if (score >= 80) {
+            colorClass = "bg-green-50 border-green-200";
+            iconClass = "ph ph-shield-check text-green-600";
+            statusText = score + "/100 \u00b7 Aprovado";
+            pulseClass = "jari-pulse-green";
+          } else if (score >= 50) {
+            colorClass = "bg-yellow-50 border-yellow-200";
+            iconClass = "ph ph-shield-warning text-yellow-600";
+            statusText = score + "/100 \u00b7 Aten\u00e7\u00e3o";
+            pulseClass = "jari-pulse-yellow";
+          } else {
+            colorClass = "bg-red-50 border-red-200";
+            iconClass = "ph ph-x-circle text-red-600";
+            statusText = score + "/100 \u00b7 Reprovado";
+            pulseClass = "jari-pulse-red";
           }
+          selo.className = "flex-1 flex items-center gap-3 rounded-xl px-5 py-3 border cursor-pointer select-none transition-all " + colorClass + " " + pulseClass;
+          icon.className = iconClass;
+          icon.style.fontSize = "26px";
+          label.textContent = statusText;
         }
 
         // Info do processo no checklist
