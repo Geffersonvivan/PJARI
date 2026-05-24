@@ -485,8 +485,10 @@ class E2ERotaATest(TestCase):
                     return_value=_mock_gemini_client("Recurso **intempestivo**. Rota A.")):
             resp = self._json_post(f"/api/processo/{pk}/confirmar-dados/", {
                 "data_sessao": "2025-06-15",
+                "recorrente": "JOAO DA SILVA TESTE",
                 "prazo_final": "2022-06-01",
                 "data_protocolo": "2022-07-15",
+                "paginas_defesa": "10-20",
                 "data_infracao": "2022-03-15",
             })
         self.assertEqual(resp.status_code, 200)
@@ -601,8 +603,10 @@ class E2ERotaBTest(TestCase):
                     return_value=_mock_gemini_client("Prescrição punitiva configurada. Rota B.")):
             resp = self._json_post(f"/api/processo/{pk}/confirmar-dados/", {
                 "data_sessao": "2025-06-15",
+                "recorrente": "JOAO DA SILVA TESTE",
                 "prazo_final": "2019-04-15",
                 "data_protocolo": "2019-04-10",
+                "paginas_defesa": "10-20",
                 "data_infracao": "2019-01-10",
                 "data_na": "2019-01-20",
                 "data_np": "2019-03-15",

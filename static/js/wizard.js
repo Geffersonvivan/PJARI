@@ -77,6 +77,63 @@
       });
   }
 
+  // ── Modal de Validação ─────────────────────────────────────────────
+
+  function _escVal(s) {
+    var d = document.createElement("div"); d.textContent = s; return d.innerHTML;
+  }
+
+  function handleValidationErrors(data, retryWithForce) {
+    if (!data.validation_errors) return false;
+
+    var modal = document.getElementById("modal-validacao");
+    var body  = document.getElementById("modal-validacao-body");
+    var btnForcar = document.getElementById("modal-validacao-forcar");
+    var btnFechar = document.getElementById("modal-validacao-fechar");
+    if (!modal || !body) return false;
+
+    // Renderizar erros
+    var html = '<ul class="space-y-3">';
+    data.validation_errors.forEach(function(e) {
+      var icon = e.bloqueante
+        ? '<i class="ph ph-prohibit text-red-500"></i>'
+        : '<i class="ph ph-warning text-amber-500"></i>';
+      html += '<li class="flex gap-3 items-start p-3 rounded-lg ' +
+        (e.bloqueante ? 'bg-red-50 border border-red-200' : 'bg-amber-50 border border-amber-200') + '">' +
+        '<span class="mt-0.5 text-lg">' + icon + '</span>' +
+        '<div>' +
+          '<p class="font-medium text-gray-800 text-sm">' + _escVal(e.mensagem) + '</p>' +
+          '<p class="text-xs text-gray-500 mt-1">' + _escVal(e.solucao) + '</p>' +
+        '</div></li>';
+    });
+    html += '</ul>';
+    body.innerHTML = html;
+
+    // Botão Forçar Avanço
+    if (data.pode_forcar && retryWithForce) {
+      btnForcar.classList.remove("hidden");
+      btnForcar.onclick = function() {
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
+        retryWithForce();
+      };
+    } else {
+      btnForcar.classList.add("hidden");
+      btnForcar.onclick = null;
+    }
+
+    // Botão Fechar
+    btnFechar.onclick = function() {
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+    };
+
+    // Mostrar modal
+    modal.classList.remove("hidden");
+    modal.classList.add("flex");
+    return true;
+  }
+
   function showStep(n) {
     document.querySelectorAll(".wizard-step").forEach((el) => {
       el.classList.toggle("hidden", parseInt(el.dataset.step, 10) !== n);
@@ -392,6 +449,12 @@
 
         api(urls.confirmarDados, { method: "POST", body: JSON.stringify(payload) })
           .then(function(data) {
+            // Erros de validação (HTTP 422)
+            if (data.validation_errors) {
+              hideLoading("dados-loading");
+              handleValidationErrors(data, function() { enviarConfirmacao(true); });
+              return;
+            }
             // Divergências detectadas (HTTP 409)
             if (data.divergencias) {
               hideLoading("dados-loading");
@@ -642,16 +705,24 @@
   var btnAdm = document.getElementById("btn-confirmar-adm");
   if (btnAdm) {
     btnAdm.addEventListener("click", function() {
-      var body = {};
-      ADM_CFG.forEach(function(cfg) {
-        body[cfg.bodyKey] = admDecisions[cfg.bodyKey] || "";
-      });
+      function enviarAdm(forceFlag) {
+        var body = {};
+        ADM_CFG.forEach(function(cfg) {
+          body[cfg.bodyKey] = admDecisions[cfg.bodyKey] || "";
+        });
+        if (forceFlag) body.force = true;
 
-      showLoading("adm-loading");
+        showLoading("adm-loading");
 
-      api(urls.admissibilidadeConfirmar, { method: "POST", body: JSON.stringify(body) })
-        .then(function(data) {
-          if (data.ok) {
+        api(urls.admissibilidadeConfirmar, { method: "POST", body: JSON.stringify(body) })
+          .then(function(data) {
+            // Erros de validação (HTTP 422)
+            if (data.validation_errors) {
+              hideLoading("adm-loading");
+              handleValidationErrors(data, function() { enviarAdm(true); });
+              return;
+            }
+            if (data.ok) {
             // Sync fallback — reload direto
             if (!data.task_id || data.task_id === "sync") {
               setTimeout(function() { transitionReload(); }, 500);
@@ -678,6 +749,8 @@
           hideLoading("adm-loading");
           alert("Erro de conexao.");
         });
+      }
+      enviarAdm(false);
     });
   }
 
@@ -772,26 +845,37 @@
   var btnTeses = document.getElementById("btn-confirmar-teses");
   if (btnTeses) {
     btnTeses.addEventListener("click", function() {
-      showLoading("tese-loading");
-      document.getElementById("tese-loading-msg").textContent = "Gerando parecer...";
+      function enviarTeses(forceFlag) {
+        var payload = { decisoes: teseDecisions };
+        if (forceFlag) payload.force = true;
 
-      api(urls.tesesConfirmar, { method: "POST", body: JSON.stringify({ decisoes: teseDecisions }) })
-        .then(function(data) {
-          if (data.ok) {
-            if (!data.task_id || data.task_id === "sync") {
-              setTimeout(function() { transitionReload(); }, 500);
+        showLoading("tese-loading");
+        document.getElementById("tese-loading-msg").textContent = "Gerando parecer...";
+
+        api(urls.tesesConfirmar, { method: "POST", body: JSON.stringify(payload) })
+          .then(function(data) {
+            if (data.validation_errors) {
+              hideLoading("tese-loading");
+              handleValidationErrors(data, function() { enviarTeses(true); });
               return;
             }
-            pollTask(data.task_id, function() { transitionReload(); }, "tese-loading");
-          } else {
+            if (data.ok) {
+              if (!data.task_id || data.task_id === "sync") {
+                setTimeout(function() { transitionReload(); }, 500);
+                return;
+              }
+              pollTask(data.task_id, function() { transitionReload(); }, "tese-loading");
+            } else {
+              hideLoading("tese-loading");
+              alert(data.error || "Erro ao confirmar teses.");
+            }
+          })
+          .catch(function() {
             hideLoading("tese-loading");
-            alert(data.error || "Erro ao confirmar teses.");
-          }
-        })
-        .catch(function() {
-          hideLoading("tese-loading");
-          alert("Erro de conexao.");
-        });
+            alert("Erro de conexao.");
+          });
+      }
+      enviarTeses(false);
     });
   }
 
@@ -1003,9 +1087,16 @@
       var editorText = document.getElementById("parecer-editor").value;
       var hasEdits = !editorWrap.classList.contains("hidden") || (editorText && editorText !== parecerTextoOriginal);
 
-      function dispararAuditoria() {
-        api(urls.auditoriaFinalizar, { method: "POST", body: JSON.stringify({}) })
+      function dispararAuditoria(forceFlag) {
+        var payload = {};
+        if (forceFlag) payload.force = true;
+        api(urls.auditoriaFinalizar, { method: "POST", body: JSON.stringify(payload) })
           .then(function(data) {
+            if (data.validation_errors) {
+              hideLoading("audit-loading");
+              handleValidationErrors(data, function() { dispararAuditoria(true); });
+              return;
+            }
             if (data.ok) {
               if (!data.task_id || data.task_id === "sync") {
                 setTimeout(function() { transitionReload(); }, 500);

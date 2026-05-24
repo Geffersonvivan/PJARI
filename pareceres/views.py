@@ -12,7 +12,14 @@ from django.views.decorators.http import require_GET, require_POST
 from .estado import FaseProcesso
 from .models import (
     Admissibilidade, BancoTese, ChatMessage, ComentarioForum, Documento,
-    Parecer, Pasta, PostForum, Processo,
+    Parecer, Pasta, PostForum, Processo, log_audit,
+)
+from .validacao import (
+    erros_to_response,
+    validar_admissibilidade,
+    validar_dados_extraidos,
+    validar_parecer,
+    validar_teses,
 )
 
 _log = logging.getLogger(__name__)
@@ -265,14 +272,10 @@ def api_confirmar_dados(request, pk):
         except (ValueError, TypeError):
             return None
 
-    # Data da sessão é obrigatória (único campo manual)
+    # Data da sessão
     data_sessao = body.get("data_sessao", "").strip()
-    if not data_sessao:
-        return JsonResponse({"error": "Data da sessão é obrigatória."}, status=400)
-
-    processo.data_sessao = _parse(data_sessao)
-    if not processo.data_sessao:
-        return JsonResponse({"error": "Data da sessão inválida."}, status=400)
+    if data_sessao:
+        processo.data_sessao = _parse(data_sessao)
 
     # Campos do Processo (preenchimento manual pelo MJ)
     if body.get("recorrente", "").strip():
@@ -287,14 +290,9 @@ def api_confirmar_dados(request, pk):
     processo.save()
 
     # Datas da Admissibilidade (preenchidas pelo MJ)
-    from .models import Admissibilidade
     adm, _ = Admissibilidade.objects.get_or_create(processo=processo)
 
-    # Data da infração é obrigatória para o cálculo de admissibilidade
     data_infracao_str = body.get("data_infracao", "").strip()
-    if not data_infracao_str and not adm.data_infracao:
-        return JsonResponse({"error": "Data da Infração é obrigatória. Consulte o PDF e preencha."}, status=400)
-
     if data_infracao_str:
         adm.data_infracao = _parse(data_infracao_str)
     if body.get("data_na", "").strip():
@@ -307,6 +305,15 @@ def api_confirmar_dados(request, pk):
         adm.tipo_penalidade = body["tipo_penalidade"].strip()
 
     adm.save()
+
+    # ── Gate de validação (spec compliance) ─────────────────────────────
+    erros = validar_dados_extraidos(processo)
+    if erros and not body.get("force"):
+        return JsonResponse(erros_to_response(erros), status=422)
+    if erros and body.get("force"):
+        log_audit("decisao", processo=processo, fase="force_advance_dados", dados={
+            "erros_ignorados": [e.campo for e in erros],
+        })
 
     # ── Confronto de dados (Fase 2 da spec) ─────────────────────────────
     # Compara dados informados pelo julgador com dados extraídos pelo Gemini.
@@ -556,33 +563,16 @@ def api_admissibilidade_confirmar(request, pk):
     adm.julgador_prescricao_intercorrente_bienal = _parse_bool(body.get("julgador_intercorrente_bienal"))
     adm.julgador_decadencia = _parse_bool(body.get("julgador_decadencia"))
 
-    # ── Bloqueios hard-coded (CETRAN/SC) ────────────────────────────────
-    import datetime as _dt
-    LIMIAR_FILTRO1 = _dt.date(2021, 4, 12)
-    LIMIAR_FILTRO2 = _dt.date(2021, 10, 22)
-
-    if adm.julgador_decadencia is True and adm.data_infracao:
-        # Filtro 1: infração < 12/04/2021 → decadência vedada (CETRAN/SC 381/2022)
-        if adm.data_infracao < LIMIAR_FILTRO1:
-            return JsonResponse({
-                "error": (
-                    "CONVERSÃO BLOQUEADA: Decadência não pode ser reconhecida para infrações "
-                    "anteriores a 12/04/2021 (Parecer CETRAN/SC 381/2022). "
-                    "Corrija a decisão de Decadência para NÃO."
-                )
-            }, status=400)
-
-        # Filtro 2: infração entre 12/04 e 21/10/2021 + suspensão/cassação → vedada
-        if (adm.data_infracao < LIMIAR_FILTRO2
-                and adm.tipo_penalidade
-                and adm.tipo_penalidade.lower() in ("suspensao", "cassacao")):
-            return JsonResponse({
-                "error": (
-                    "CONVERSÃO BLOQUEADA: Decadência não se aplica a penalidades de suspensão/cassação "
-                    "no período de 12/04/2021 a 21/10/2021 (Nota CETRAN/SC 02/03/2023). "
-                    "Corrija a decisão de Decadência para NÃO."
-                )
-            }, status=400)
+    # ── Gate de validação (spec compliance) ─────────────────────────────
+    erros = validar_admissibilidade(processo, body)
+    if erros:
+        bloqueantes = any(e.bloqueante for e in erros)
+        if not body.get("force") or bloqueantes:
+            return JsonResponse(erros_to_response(erros), status=422)
+        # force=true e sem bloqueantes → audit log + avança
+        log_audit("decisao", processo=processo, fase="force_advance_admissibilidade", dados={
+            "erros_ignorados": [e.campo for e in erros],
+        })
 
     # ── Recalcular texto determinístico com flags do julgador ─────────────
     from .services.service_admissibilidade import gerar_texto_prescricao_decadencia
@@ -593,7 +583,6 @@ def api_admissibilidade_confirmar(request, pk):
     adm.save()
 
     # ── Audit log da decisão do julgador ─────────────────────────────────
-    from .models import log_audit
     log_audit("decisao", processo=processo, fase="admissibilidade_confirmada", dados={
         "julgador_tempestivo": adm.julgador_tempestivo,
         "julgador_prescricao_punitiva": adm.julgador_prescricao_punitiva,
@@ -710,6 +699,15 @@ def api_teses_confirmar(request, pk):
 
     body = json.loads(request.body) if request.body else {}
     decisoes = body.get("decisoes", {})
+
+    # ── Gate de validação ───────────────────────────────────────────────
+    erros = validar_teses(processo, decisoes)
+    if erros and not body.get("force"):
+        return JsonResponse(erros_to_response(erros), status=422)
+    if erros and body.get("force"):
+        log_audit("decisao", processo=processo, fase="force_advance_teses", dados={
+            "erros_ignorados": [e.campo for e in erros],
+        })
 
     # Salvar decisões (tese_id -> true/false)
     for tese in processo.teses.all():
@@ -836,6 +834,17 @@ def api_auditoria_finalizar(request, pk):
 
     if processo.fase not in (FaseProcesso.AUDITORIA, FaseProcesso.PARECER, FaseProcesso.PARECER_GERANDO):
         return JsonResponse({"error": "Processo não está na fase de auditoria."}, status=400)
+
+    # ── Gate de validação (parecer completo?) ───────────────────────────
+    body = json.loads(request.body) if request.body else {}
+    erros = validar_parecer(processo)
+    if erros:
+        bloqueantes = any(e.bloqueante for e in erros)
+        if not body.get("force") or bloqueantes:
+            return JsonResponse(erros_to_response(erros), status=422)
+        log_audit("decisao", processo=processo, fase="force_advance_auditoria", dados={
+            "erros_ignorados": [e.campo for e in erros],
+        })
 
     # Se não está em AUDITORIA ainda, avançar
     if processo.fase in (FaseProcesso.PARECER, FaseProcesso.PARECER_GERANDO):
@@ -1090,7 +1099,6 @@ def api_agente_mensagem(request, pk):
         )
         resposta = resp.content[0].text
 
-        from .models import log_audit
         log_audit(
             "ia_request", processo=processo, fase="agente_lateral",
             provider="anthropic", model_name="claude-haiku-4-5-20251001",

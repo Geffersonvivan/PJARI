@@ -799,8 +799,31 @@
 </style>
 {% endblock %}
 
+<!-- Modal de Validação (reutilizável) -->
+<div id="modal-validacao" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40">
+  <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden">
+    <div class="px-6 py-4 bg-amber-50 border-b border-amber-200 flex items-center gap-3">
+      <i class="ph ph-warning text-2xl text-amber-600"></i>
+      <h3 class="font-semibold text-gray-800">Dados incompletos para avancar</h3>
+    </div>
+    <div id="modal-validacao-body" class="px-6 py-4 max-h-80 overflow-y-auto">
+      <!-- Erros são injetados aqui via JS -->
+    </div>
+    <div class="px-6 py-4 bg-gray-50 border-t flex justify-end gap-3">
+      <button id="modal-validacao-fechar"
+        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+        Corrigir
+      </button>
+      <button id="modal-validacao-forcar"
+        class="hidden px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition-colors">
+        <i class="ph ph-arrow-right mr-1"></i> Forcar Avanco
+      </button>
+    </div>
+  </div>
+</div>
+
 {% block extra_js %}
-<script src="{% static 'js/wizard.js' %}?v=20260524d"></script>
+<script src="{% static 'js/wizard.js' %}?v=20260524e"></script>
 <script>
 (function(){
   var _pdfCollapsed = false;
