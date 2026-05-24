@@ -63,6 +63,7 @@ urlpatterns = [
 
     # API: Fórum
     path("api/forum/", views.api_forum_listar, name="api_forum_listar"),
+    path("api/forum/unread/", views.api_forum_unread_count, name="api_forum_unread_count"),
     path("api/forum/criar/", views.api_forum_criar_post, name="api_forum_criar_post"),
     path("api/forum/<int:post_id>/comentarios/", views.api_forum_comentarios, name="api_forum_comentarios"),
     path("api/forum/<int:post_id>/comentar/", views.api_forum_comentar, name="api_forum_comentar"),

@@ -1150,7 +1150,32 @@ def api_forum_listar(request):
             "qtd_curtidas": p.qtd_curtidas,
         })
 
+    # Marcar fórum como visto
+    from django.utils import timezone as _tz
+    try:
+        profile = request.user.profile
+        profile.forum_last_seen_at = _tz.now()
+        profile.save(update_fields=["forum_last_seen_at"])
+    except Exception:
+        pass
+
     return JsonResponse({"posts": result})
+
+
+@login_required
+@require_GET
+def api_forum_unread_count(request):
+    """Retorna quantidade de posts novos desde o último acesso ao fórum."""
+    try:
+        last_seen = request.user.profile.forum_last_seen_at
+    except Exception:
+        last_seen = None
+
+    qs = PostForum.objects.all()
+    if last_seen:
+        qs = qs.filter(created_at__gt=last_seen)
+    count = qs.count()
+    return JsonResponse({"unread": count})
 
 
 @login_required

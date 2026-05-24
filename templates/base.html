@@ -117,6 +117,14 @@
     .jari-pulse-green { animation: jari-pulse-green 2s infinite; }
     .jari-pulse-yellow { animation: jari-pulse-yellow 2s infinite; }
     .jari-pulse-red { animation: jari-pulse-red 2s infinite; }
+
+    /* Forum badge bounce */
+    @keyframes forum-bounce {
+      0%,100% { transform: scale(1); }
+      30% { transform: scale(1.3); }
+      60% { transform: scale(0.9); }
+    }
+    .forum-badge-bounce { animation: forum-bounce .4s ease-out; }
   </style>
   {% block extra_css %}{% endblock %}
 </head>
@@ -143,8 +151,9 @@
       {% if user.is_authenticated %}
       <!-- Fórum -->
       <button onclick="abrirModalForum()" id="btn-forum-navbar" title="Fórum dos Julgadores"
-         class="flex items-center justify-center w-9 h-9 rounded-xl text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+         class="relative flex items-center justify-center w-9 h-9 rounded-xl text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors">
         <i class="ph ph-chats-circle text-xl"></i>
+        <span id="forum-badge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 forum-badge-bounce">0</span>
       </button>
       <!-- Banco de Teses -->
       <button onclick="abrirModalTeses()" id="btn-teses-navbar" title="Banco de Teses"
@@ -303,5 +312,43 @@ function setClerkAvatar(imageUrl) {
 {% include "includes/forum_modal.html" %}
 {% include "includes/teses_modal.html" %}
 {% block extra_js %}{% endblock %}
+
+{% if user.is_authenticated %}
+<script>
+(function() {
+  var badge = document.getElementById("forum-badge");
+  if (!badge) return;
+
+  function checkUnread() {
+    fetch("/api/forum/unread/", { credentials: "same-origin" })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var n = data.unread || 0;
+        if (n > 0) {
+          badge.textContent = n > 99 ? "99+" : n;
+          badge.classList.remove("hidden");
+          // Re-trigger bounce
+          badge.classList.remove("forum-badge-bounce");
+          void badge.offsetWidth;
+          badge.classList.add("forum-badge-bounce");
+        } else {
+          badge.classList.add("hidden");
+        }
+      })
+      .catch(function() {});
+  }
+
+  // Limpar badge ao abrir fórum
+  var _origAbrir = window.abrirModalForum;
+  window.abrirModalForum = function() {
+    badge.classList.add("hidden");
+    if (_origAbrir) _origAbrir();
+  };
+
+  checkUnread();
+  setInterval(checkUnread, 30000);
+})();
+</script>
+{% endif %}
 </body>
 </html>

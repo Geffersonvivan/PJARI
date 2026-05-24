@@ -18,9 +18,10 @@
     <div class="flex items-center gap-2 text-sm">
       {% if user.is_authenticated %}
       {# Fórum: sempre acessível (reportar erros durante julgamento) #}
-      <button onclick="abrirModalForum()" title="Fórum dos Julgadores"
-         class="flex items-center justify-center w-9 h-9 rounded-xl text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+      <button onclick="abrirModalForum()" title="Fórum dos Julgadores" id="btn-forum-navbar"
+         class="relative flex items-center justify-center w-9 h-9 rounded-xl text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors">
         <i class="ph ph-chats-circle text-xl"></i>
+        <span id="forum-badge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 forum-badge-bounce">0</span>
       </button>
       {# Banco de Teses: só após finalizar #}
       {% if processo.fase == 'finalizado' %}

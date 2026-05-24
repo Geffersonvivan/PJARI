@@ -24,6 +24,7 @@ class UserProfile(models.Model):
 
     # UX
     has_seen_tour = models.BooleanField(default=False)
+    forum_last_seen_at = models.DateTimeField(null=True, blank=True)
     can_view_global_stats = models.BooleanField(
         default=False, verbose_name="Ver Painel Global"
     )
