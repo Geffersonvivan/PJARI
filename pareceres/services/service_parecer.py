@@ -17,6 +17,28 @@ from . import ServiceResult
 
 _log = logging.getLogger(__name__)
 
+# Regex para localizar a seção "PRESCRIÇÃO E DECADÊNCIA" no parecer
+_RE_PRESCRICAO_SECTION = re.compile(
+    r'(\*{0,2}PRESCRI[ÇC][ÃA]O E DECAD[ÊE]NCIA\*{0,2})'  # título (com ou sem negrito/acentos)
+    r'([\s\S]*?)'                                            # conteúdo da seção
+    r'(?=\*{0,2}(?:MATERIALIDADE|GARANTIAS|PARECER FINAL|VOTO)\*{0,2})',  # próxima seção
+    re.IGNORECASE,
+)
+
+
+def _inject_deterministic_prescricao(parecer_text: str, texto_deterministico: str) -> str:
+    """Substitui a seção PRESCRIÇÃO E DECADÊNCIA do LLM pelo texto determinístico."""
+    match = _RE_PRESCRICAO_SECTION.search(parecer_text)
+    if not match:
+        _log.warning("[PARECER] Seção PRESCRIÇÃO E DECADÊNCIA não encontrada para injeção")
+        return parecer_text
+
+    titulo = match.group(1)
+    replacement = f"{titulo}\n\n{texto_deterministico}\n\n"
+    result = parecer_text[:match.start()] + replacement + parecer_text[match.end():]
+    _log.info("[PARECER] Seção PRESCRIÇÃO E DECADÊNCIA substituída pelo texto determinístico")
+    return result
+
 
 def _trunc(texto: str, max_chars: int) -> str:
     if not texto or len(texto) <= max_chars:
@@ -167,6 +189,10 @@ def execute(processo) -> ServiceResult:
         return ServiceResult.falha("Erro ao gerar parecer: Anthropic indisponível.")
 
     parecer_text = parecer_text.strip()
+
+    # ── Pós-processamento: forçar texto determinístico na seção Prescrição ──
+    if _texto_prescricao:
+        parecer_text = _inject_deterministic_prescricao(parecer_text, _texto_prescricao)
 
     if not parecer_text or len(parecer_text) < 200:
         processo.fase = FaseProcesso.PARECER

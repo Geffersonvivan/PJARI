@@ -19,6 +19,179 @@ from . import ServiceResult
 _log = logging.getLogger(__name__)
 
 
+def gerar_texto_prescricao_decadencia(processo, adm, *, usar_flags_julgador=False):
+    """
+    Gera o bloco determinístico 3.1-3.4 (Prescrição e Decadência).
+
+    Se usar_flags_julgador=True, usa flag_* (decisão efetiva do julgador)
+    em vez de has_* (cálculo automático). Chamado após confirmação do julgador.
+    """
+
+    data_infracao = adm.data_infracao
+    data_na = adm.data_na
+    data_np = adm.data_np
+    data_instauracao = adm.data_instauracao
+
+    _marcos_semanticos = sorted({
+        d for d in [data_na, data_np, data_instauracao]
+        if d is not None
+        and data_infracao < d < (processo.data_sessao or datetime.date.max)
+    })
+    marcos_validos = _marcos_semanticos if _marcos_semanticos else []
+    ultimo_marco = max(marcos_validos) if marcos_validos else data_infracao
+
+    # COVID-19: desconto proporcional
+    _ultimo_marco_punit = max(marcos_validos) if marcos_validos else data_infracao
+    if _ultimo_marco_punit and _ultimo_marco_punit <= JariMath.FIM_COVID_SUSPENSAO:
+        if _ultimo_marco_punit >= JariMath.INICIO_COVID_SUSPENSAO:
+            _desconto_covid = (JariMath.FIM_COVID_SUSPENSAO - _ultimo_marco_punit).days + 1
+        else:
+            _desconto_covid = JariMath.DIAS_SUSPENSAO_COVID
+    else:
+        _desconto_covid = 0
+
+    # Flags: usar decisão do julgador ou automática
+    if usar_flags_julgador:
+        f_punitiva = adm.flag_prescricao_punitiva
+        f_intercorrente = adm.flag_prescricao_intercorrente
+        f_bienal = adm.flag_prescricao_intercorrente_bienal
+        f_decadencia = adm.flag_decadencia
+    else:
+        f_punitiva = adm.has_prescricao_punitiva
+        f_intercorrente = adm.has_prescricao_intercorrente
+        f_bienal = adm.has_prescricao_intercorrente_bienal
+        f_decadencia = adm.has_decadencia
+
+    def _fmt(d):
+        return d.strftime("%d/%m/%Y") if d else "N/A"
+
+    # Aniversários
+    _aniv_punitiva = JariMath._aniversario_5_anos(ultimo_marco)
+    if _desconto_covid:
+        _aniv_punitiva += datetime.timedelta(days=_desconto_covid)
+
+    try:
+        _aniv_trienal = processo.data_protocolo.replace(year=processo.data_protocolo.year + 3)
+    except (ValueError, AttributeError):
+        _aniv_trienal = None
+
+    try:
+        _aniv_bienal = processo.data_protocolo.replace(year=processo.data_protocolo.year + 2)
+    except (ValueError, AttributeError):
+        _aniv_bienal = None
+
+    # 3.1 Prescrição punitiva
+    _covid_frase = (
+        f", considerando o último ato interruptivo na data de {_fmt(ultimo_marco)}"
+        if ultimo_marco != data_infracao else ""
+    )
+    _covid_desconto = (
+        f" O prazo prescricional foi acrescido de {_desconto_covid} dias em razão da "
+        "suspensão de prazos pela Resolução CONTRAN 782/2020 (COVID-19)."
+        if _desconto_covid else ""
+    )
+    if f_punitiva:
+        texto_31 = (
+            f"A prescrição punitiva quinquenal da Lei 9.873/99 ocorreu entre a data da infração "
+            f"em {_fmt(data_infracao)} e a presente sessão de julgamento em {_fmt(processo.data_sessao)}. "
+            f"O prazo de cinco anos foi ultrapassado{_covid_frase}. "
+            f"Configura-se a prescrição punitiva pela superação do prazo legal estabelecido.{_covid_desconto}"
+        )
+    else:
+        texto_31 = (
+            f"A prescrição punitiva quinquenal da Lei 9.873/99 não se configurou. "
+            f"O intervalo entre a data da infração em {_fmt(data_infracao)} "
+            f"e a sessão de julgamento em {_fmt(processo.data_sessao)} "
+            f"não ultrapassou o prazo de cinco anos{_covid_frase}.{_covid_desconto}"
+        )
+
+    # 3.2 Prescrição intercorrente trienal
+    if f_intercorrente:
+        texto_32 = (
+            f"A prescrição intercorrente trienal da Lei 9.873/99 configurou-se entre o protocolo "
+            f"do recurso JARI em {_fmt(processo.data_protocolo)} e a presente sessão de julgamento "
+            f"em {_fmt(processo.data_sessao)}. O transcurso de exatos três anos superou o prazo máximo "
+            "estabelecido pela legislação federal, extinguindo a pretensão punitiva estatal."
+        )
+    else:
+        texto_32 = (
+            f"A prescrição intercorrente trienal da Lei 9.873/99 não se configurou. "
+            f"O prazo de três anos é contado a partir da data de protocolo do recurso perante a JARI, "
+            f"ocorrida em {_fmt(processo.data_protocolo)}. A sessão de julgamento ocorreu em "
+            f"{_fmt(processo.data_sessao)}, data anterior ao término do triênio, que somente se "
+            f"completaria em {_fmt(_aniv_trienal)}."
+        )
+
+    # 3.3 Prescrição intercorrente bienal
+    # Safety lock: protocolo anterior a 01/01/2024 → não se aplica (independente da flag)
+    _bienal_nao_se_aplica = (
+        processo.data_protocolo and processo.data_protocolo < datetime.date(2024, 1, 1)
+    )
+
+    if _bienal_nao_se_aplica:
+        texto_33 = (
+            "A prescrição intercorrente bienal do artigo 285, parágrafo 6º, combinado com o artigo "
+            "289-A do Código de Trânsito Brasileiro não se aplica ao presente caso. O protocolo do "
+            f"recurso ocorreu em {_fmt(processo.data_protocolo)}, anteriormente a 01/01/2024, data a "
+            "partir da qual a Lei 14.229/2021 passou a produzir efeitos para fins de contagem do prazo "
+            "bienal. Análise prejudicada."
+        )
+    elif f_bienal:
+        texto_33 = (
+            f"A prescrição intercorrente bienal do artigo 285, parágrafo 6º, combinado com o artigo "
+            f"289-A do Código de Trânsito Brasileiro configurou-se pelo transcurso de dois anos "
+            f"entre o protocolo do recurso em {_fmt(processo.data_protocolo)} e a sessão de julgamento "
+            f"em {_fmt(processo.data_sessao)}. A Lei 14.229/2021 estabeleceu prazo bienal para julgamento "
+            "dos recursos, sendo esta prescrição matéria de ordem pública que deve ser reconhecida de ofício."
+        )
+    else:
+        texto_33 = (
+            f"A prescrição intercorrente bienal do artigo 285, parágrafo 6º, combinado com o artigo "
+            f"289-A do Código de Trânsito Brasileiro não se configurou. O protocolo do recurso ocorreu "
+            f"em {_fmt(processo.data_protocolo)} e a sessão de julgamento em {_fmt(processo.data_sessao)}, "
+            f"dentro do prazo bienal que se completaria em {_fmt(_aniv_bienal)}."
+        )
+
+    # 3.4 Decadência
+    # Determinar regime: infração < 12/04/2021 → vedada retroatividade
+    _antes_contran = data_infracao and data_infracao < datetime.date(2021, 4, 12)
+    _susp_cassacao = (
+        adm.tipo_penalidade and adm.tipo_penalidade.lower() in ("suspensao", "cassacao")
+        and data_infracao and data_infracao < datetime.date(2021, 10, 22)
+    )
+
+    if _antes_contran and not f_decadencia:
+        texto_34 = (
+            f"A infração ocorreu em {_fmt(data_infracao)}, anteriormente à vigência da "
+            "Resolução CONTRAN 844/2021. Conforme Parecer CETRAN/SC 381/2022, os prazos "
+            "decadenciais não se aplicam às infrações anteriores à vigência normativa, vedada a "
+            "aplicação retroativa. A análise foi encaminhada exclusivamente à Prescrição Punitiva "
+            "(Lei 9.873/1999)."
+        )
+    elif _susp_cassacao and not f_decadencia:
+        texto_34 = (
+            f"A infração ocorreu em {_fmt(data_infracao)}, no período de transição normativa. "
+            "Conforme Nota CETRAN/SC 02/03/2023, a decadência de 180/360 dias restringe-se "
+            "exclusivamente a multas e advertências neste período, não se aplicando a penalidades "
+            "de suspensão ou cassação. A análise foi encaminhada à Prescrição Punitiva (Lei 9.873/1999)."
+        )
+    elif f_decadencia:
+        texto_34 = (
+            f"A decadência configurou-se no presente caso. A infração ocorreu em {_fmt(data_infracao)}."
+        )
+    else:
+        texto_34 = (
+            f"A decadência não se configurou no presente caso. A infração ocorreu em {_fmt(data_infracao)}."
+        )
+
+    return (
+        f"**3.1 Prescrição punitiva**\n\n{texto_31}\n\n"
+        f"**3.2 Prescrição intercorrente trienal**\n\n{texto_32}\n\n"
+        f"**3.3 Prescrição intercorrente bienal**\n\n{texto_33}\n\n"
+        f"**3.4 Decadência**\n\n{texto_34}"
+    )
+
+
 def execute(processo) -> ServiceResult:
     """
     Calcula admissibilidade: JariMath + Anthropic (Claude).
@@ -162,133 +335,8 @@ def execute(processo) -> ServiceResult:
     )
 
     # ── Textos determinísticos para seções 3.1-3.4 do Parecer (Fase 5) ───
-    def _fmt(d):
-        return d.strftime("%d/%m/%Y") if d else "N/A"
-
-    # Aniversários para os textos
-    _aniv_punitiva = JariMath._aniversario_5_anos(ultimo_marco)
-    if _desconto_covid:
-        _aniv_punitiva += datetime.timedelta(days=_desconto_covid)
-
-    try:
-        _aniv_trienal = processo.data_protocolo.replace(year=processo.data_protocolo.year + 3)
-    except (ValueError, AttributeError):
-        _aniv_trienal = None
-
-    try:
-        _aniv_bienal = processo.data_protocolo.replace(year=processo.data_protocolo.year + 2)
-    except (ValueError, AttributeError):
-        _aniv_bienal = None
-
-    # 3.1 Prescrição punitiva
-    _covid_frase = (
-        f", considerando o último ato interruptivo na data de {_fmt(ultimo_marco)}"
-        if ultimo_marco != data_infracao else ""
-    )
-    _covid_desconto = (
-        f" O prazo prescricional foi acrescido de {_desconto_covid} dias em razão da "
-        "suspensão de prazos pela Resolução CONTRAN 782/2020 (COVID-19)."
-        if _desconto_covid else ""
-    )
-    if adm.has_prescricao_punitiva:
-        texto_31 = (
-            f"A prescrição punitiva quinquenal da Lei 9.873/99 ocorreu entre a data da infração "
-            f"em {_fmt(data_infracao)} e a presente sessão de julgamento em {_fmt(processo.data_sessao)}. "
-            f"O prazo de cinco anos foi ultrapassado{_covid_frase}. "
-            f"Configura-se a prescrição punitiva pela superação do prazo legal estabelecido.{_covid_desconto}"
-        )
-    else:
-        texto_31 = (
-            f"A prescrição punitiva quinquenal da Lei 9.873/99 não se configurou. "
-            f"O intervalo entre a data da infração em {_fmt(data_infracao)} "
-            f"e a sessão de julgamento em {_fmt(processo.data_sessao)} "
-            f"não ultrapassou o prazo de cinco anos{_covid_frase}.{_covid_desconto}"
-        )
-
-    # 3.2 Prescrição intercorrente trienal
-    if adm.has_prescricao_intercorrente:
-        texto_32 = (
-            f"A prescrição intercorrente trienal da Lei 9.873/99 configurou-se entre o protocolo "
-            f"do recurso JARI em {_fmt(processo.data_protocolo)} e a presente sessão de julgamento "
-            f"em {_fmt(processo.data_sessao)}. O transcurso de exatos três anos superou o prazo máximo "
-            "estabelecido pela legislação federal, extinguindo a pretensão punitiva estatal."
-        )
-    else:
-        texto_32 = (
-            f"A prescrição intercorrente trienal da Lei 9.873/99 não se configurou. "
-            f"O prazo de três anos é contado a partir da data de protocolo do recurso perante a JARI, "
-            f"ocorrida em {_fmt(processo.data_protocolo)}. A sessão de julgamento ocorreu em "
-            f"{_fmt(processo.data_sessao)}, data anterior ao término do triênio, que somente se "
-            f"completaria em {_fmt(_aniv_trienal)}."
-        )
-
-    # 3.3 Prescrição intercorrente bienal
-    _bienal_nao_se_aplica = "NÃO SE APLICA" in relatorio_inter_bienal
-
-    if _bienal_nao_se_aplica:
-        texto_33 = (
-            "A prescrição intercorrente bienal do artigo 285, parágrafo 6º, combinado com o artigo "
-            "289-A do Código de Trânsito Brasileiro não se aplica ao presente caso. O protocolo do "
-            f"recurso ocorreu em {_fmt(processo.data_protocolo)}, anteriormente a 01/01/2024, data a "
-            "partir da qual a Lei 14.229/2021 passou a produzir efeitos para fins de contagem do prazo "
-            "bienal. Análise prejudicada."
-        )
-    elif adm.has_prescricao_intercorrente_bienal:
-        texto_33 = (
-            f"A prescrição intercorrente bienal do artigo 285, parágrafo 6º, combinado com o artigo "
-            f"289-A do Código de Trânsito Brasileiro configurou-se pelo transcurso de dois anos "
-            f"entre o protocolo do recurso em {_fmt(processo.data_protocolo)} e a sessão de julgamento "
-            f"em {_fmt(processo.data_sessao)}. A Lei 14.229/2021 estabeleceu prazo bienal para julgamento "
-            "dos recursos, sendo esta prescrição matéria de ordem pública que deve ser reconhecida de ofício."
-        )
-    else:
-        texto_33 = (
-            f"A prescrição intercorrente bienal do artigo 285, parágrafo 6º, combinado com o artigo "
-            f"289-A do Código de Trânsito Brasileiro não se configurou. O protocolo do recurso ocorreu "
-            f"em {_fmt(processo.data_protocolo)} e a sessão de julgamento em {_fmt(processo.data_sessao)}, "
-            f"dentro do prazo bienal que se completaria em {_fmt(_aniv_bienal)}."
-        )
-
-    # 3.4 Decadência
-    if decadencia_final == "NÃO SE APLICA":
-        # Extrair faixa temporal do relatório
-        if "Antes 12/04/2021" in relatorio_decad:
-            texto_34 = (
-                f"A infração ocorreu em {_fmt(data_infracao)}, anteriormente à vigência da "
-                "Resolução CONTRAN 844/2021. Conforme Parecer CETRAN/SC 381/2022, os prazos "
-                "decadenciais não se aplicam às infrações anteriores à vigência normativa, vedada a "
-                "aplicação retroativa. A análise foi encaminhada exclusivamente à Prescrição Punitiva "
-                "(Lei 9.873/1999)."
-            )
-        elif "Suspensão/Cassação" in relatorio_decad:
-            texto_34 = (
-                f"A infração ocorreu em {_fmt(data_infracao)}, no período de transição normativa. "
-                "Conforme Nota CETRAN/SC 02/03/2023, a decadência de 180/360 dias restringe-se "
-                "exclusivamente a multas e advertências neste período, não se aplicando a penalidades "
-                "de suspensão ou cassação. A análise foi encaminhada à Prescrição Punitiva (Lei 9.873/1999)."
-            )
-        else:
-            texto_34 = (
-                f"A decadência não se aplica ao presente caso. "
-                f"A infração ocorreu em {_fmt(data_infracao)}."
-            )
-    elif adm.has_decadencia:
-        texto_34 = (
-            f"A decadência configurou-se no presente caso. A infração ocorreu em {_fmt(data_infracao)}. "
-            f"{relatorio_decad}"
-        )
-    else:
-        texto_34 = (
-            f"A decadência não se configurou no presente caso. A infração ocorreu em {_fmt(data_infracao)}. "
-            f"{relatorio_decad}"
-        )
-
-    # Montar bloco completo da seção 3
-    adm.fundamentacoes["texto_prescricao_decadencia"] = (
-        f"**3.1 Prescrição punitiva**\n\n{texto_31}\n\n"
-        f"**3.2 Prescrição intercorrente trienal**\n\n{texto_32}\n\n"
-        f"**3.3 Prescrição intercorrente bienal**\n\n{texto_33}\n\n"
-        f"**3.4 Decadência**\n\n{texto_34}"
+    adm.fundamentacoes["texto_prescricao_decadencia"] = gerar_texto_prescricao_decadencia(
+        processo, adm, usar_flags_julgador=False,
     )
 
     # ── Geração do texto via Anthropic (Claude) ─────────────────────────

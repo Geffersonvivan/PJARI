@@ -533,6 +533,12 @@ def api_admissibilidade_confirmar(request, pk):
                 )
             }, status=400)
 
+    # ── Recalcular texto determinístico com flags do julgador ─────────────
+    from .services.service_admissibilidade import gerar_texto_prescricao_decadencia
+    adm.fundamentacoes = adm.fundamentacoes or {}
+    adm.fundamentacoes["texto_prescricao_decadencia"] = gerar_texto_prescricao_decadencia(
+        processo, adm, usar_flags_julgador=True,
+    )
     adm.save()
 
     # ── Audit log da decisão do julgador ─────────────────────────────────
