@@ -17,20 +17,18 @@
     </div>
     <div class="flex items-center gap-2 text-sm">
       {% if user.is_authenticated %}
-      {# Ícones desabilitados durante julgamento, habilitados quando finalizado #}
-      {% if processo.fase == 'finalizado' %}
+      {# Fórum: sempre acessível (reportar erros durante julgamento) #}
       <button onclick="abrirModalForum()" title="Fórum dos Julgadores"
          class="flex items-center justify-center w-9 h-9 rounded-xl text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors">
         <i class="ph ph-chats-circle text-xl"></i>
       </button>
+      {# Banco de Teses: só após finalizar #}
+      {% if processo.fase == 'finalizado' %}
       <button onclick="abrirModalTeses()" title="Banco de Teses"
          class="flex items-center justify-center w-9 h-9 rounded-xl text-gray-500 hover:text-purple-600 hover:bg-purple-50 transition-colors">
         <i class="ph ph-books text-xl"></i>
       </button>
       {% else %}
-      <span class="flex items-center justify-center w-9 h-9 rounded-xl text-gray-300 cursor-default" title="Disponível após finalizar">
-        <i class="ph ph-chats-circle text-xl"></i>
-      </span>
       <span class="flex items-center justify-center w-9 h-9 rounded-xl text-gray-300 cursor-default" title="Disponível após finalizar">
         <i class="ph ph-books text-xl"></i>
       </span>
