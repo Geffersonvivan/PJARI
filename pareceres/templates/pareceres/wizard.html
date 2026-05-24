@@ -51,6 +51,9 @@
 {% block footer %}{% endblock %}
 
 {% block content %}
+<!-- Overlay de transição: cobre a tela durante reload para evitar flash -->
+<div id="wizard-transition"></div>
+
 <div class="w-full py-5 flex-1 flex flex-col" style="padding-left:50px;padding-right:50px;"
      id="wizard-root"
      data-processo-id="{{ processo.pk }}"
@@ -711,6 +714,19 @@
 
 {% block extra_css %}
 <style>
+  /* Anti-FOUC: garantir que hidden funcione antes do Tailwind CDN */
+  .hidden { display: none !important; }
+
+  /* Overlay de transição — visível por padrão, cobre tudo durante reload */
+  #wizard-transition {
+    position: fixed; inset: 0; z-index: 9999;
+    background: #fff;
+    opacity: 1;
+    transition: opacity .25s ease-out;
+    pointer-events: none;
+  }
+  #wizard-transition.fade-out { opacity: 0; }
+
   .pdf-tab {
     padding: 5px 14px; font-size: 12.5px; font-weight: 500;
     color: #5f6368; background: transparent; border: none;
@@ -766,7 +782,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/wizard.js' %}?v=20260523f"></script>
+<script src="{% static 'js/wizard.js' %}?v=20260523g"></script>
 <script>
 (function(){
   var _pdfCollapsed = false;

@@ -39,6 +39,25 @@
     processoMover: root.dataset.urlProcessoMover,
   };
 
+  // ── Transição limpa entre fases ────────────────────────────────────────
+  var transitionOverlay = document.getElementById("wizard-transition");
+
+  function transitionReload() {
+    if (transitionOverlay) {
+      transitionOverlay.classList.remove("fade-out");
+      transitionOverlay.style.pointerEvents = "all";
+    }
+    requestAnimationFrame(function() { location.reload(); });
+  }
+
+  // Fade-out do overlay após carregamento completo
+  if (transitionOverlay) {
+    transitionOverlay.classList.add("fade-out");
+    transitionOverlay.addEventListener("transitionend", function() {
+      transitionOverlay.style.pointerEvents = "none";
+    }, { once: true });
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────────
 
   function api(url, opts = {}) {
@@ -163,7 +182,7 @@
 
             // Execução síncrona (sem Celery) — reload direto
             if (!data.task_id || data.task_id === "sync") {
-              setTimeout(() => location.reload(), 500);
+              setTimeout(() => transitionReload(), 500);
               return;
             }
 
@@ -206,16 +225,16 @@
 
             pollTask(data.task_id, () => {
               clearInterval(progressInterval);
-              location.reload();
+              transitionReload();
             });
           } else {
             alert(data.error || "Erro no upload.");
-            location.reload();
+            transitionReload();
           }
         })
         .catch(() => {
           alert("Erro de conexao.");
-          location.reload();
+          transitionReload();
         });
   }
   window._wizDoUpload = doUpload;
@@ -347,9 +366,9 @@
       api(urls.confirmarDados, { method: "POST", body: JSON.stringify(body) })
         .then(function(data) {
           if (data.ok && data.task_id && data.task_id !== "sync") {
-            pollTask(data.task_id, function() { location.reload(); }, "dados-loading");
+            pollTask(data.task_id, function() { transitionReload(); }, "dados-loading");
           } else if (data.ok) {
-            setTimeout(function() { location.reload(); }, 500);
+            setTimeout(function() { transitionReload(); }, 500);
           } else {
             hideLoading("dados-loading");
             alert(data.error || "Erro ao confirmar dados.");
@@ -548,7 +567,7 @@
       api(urls.avancar, { method: "POST", body: JSON.stringify({ proxima_fase: "documentos_extraidos" }) })
         .then(function(data) {
           if (data.error) { alert(data.error); return; }
-          location.reload();
+          transitionReload();
         })
         .catch(function() { alert("Erro de conexao."); });
     });
@@ -562,9 +581,9 @@
         .then(function(data) {
           if (data.ok) {
             if (!data.task_id || data.task_id === "sync") {
-              setTimeout(function() { location.reload(); }, 500);
+              setTimeout(function() { transitionReload(); }, 500);
             } else {
-              pollTask(data.task_id, function() { location.reload(); }, "adm-loading");
+              pollTask(data.task_id, function() { transitionReload(); }, "adm-loading");
             }
           } else {
             hideLoading("adm-loading");
@@ -593,18 +612,18 @@
           if (data.ok) {
             // Sync fallback — reload direto
             if (!data.task_id || data.task_id === "sync") {
-              setTimeout(function() { location.reload(); }, 500);
+              setTimeout(function() { transitionReload(); }, 500);
               return;
             }
 
             if (data.skip_teses) {
               document.querySelector("#adm-loading .text-gray-600").textContent = "Gerando parecer (merito prejudicado)...";
-              pollTask(data.task_id, function() { location.reload(); }, "adm-loading");
+              pollTask(data.task_id, function() { transitionReload(); }, "adm-loading");
             } else {
               document.querySelector("#adm-loading .text-gray-600").textContent = "Extraindo teses...";
               pollTask(data.task_id, function(result) {
-                if (result && result.chained) { location.reload(); return; }
-                location.reload();
+                if (result && result.chained) { transitionReload(); return; }
+                transitionReload();
               }, "adm-loading");
             }
           } else {
@@ -717,10 +736,10 @@
         .then(function(data) {
           if (data.ok) {
             if (!data.task_id || data.task_id === "sync") {
-              setTimeout(function() { location.reload(); }, 500);
+              setTimeout(function() { transitionReload(); }, 500);
               return;
             }
-            pollTask(data.task_id, function() { location.reload(); }, "tese-loading");
+            pollTask(data.task_id, function() { transitionReload(); }, "tese-loading");
           } else {
             hideLoading("tese-loading");
             alert(data.error || "Erro ao confirmar teses.");
@@ -915,14 +934,14 @@
           .then(function(data) {
             if (data.ok) {
               if (!data.task_id || data.task_id === "sync") {
-                setTimeout(function() { location.reload(); }, 500);
+                setTimeout(function() { transitionReload(); }, 500);
                 return;
               }
               pollTask(data.task_id, function(result) {
                 if (result && result.erro) {
                   alert(result.erro);
                 }
-                location.reload();
+                transitionReload();
               }, "audit-loading");
             } else {
               hideLoading("audit-loading");
@@ -1045,9 +1064,9 @@
                   if (r.ok && r.task_id && r.task_id !== "sync") {
                     pollTask(r.task_id, function(res) {
                       if (res && res.erro) alert(res.erro);
-                      location.reload();
+                      transitionReload();
                     }, "audit-loading");
-                  } else { location.reload(); }
+                  } else { transitionReload(); }
                 })
                 .catch(function() { hideLoading("audit-loading"); });
               return;
@@ -1201,12 +1220,12 @@
     var modal = document.getElementById("modal-documentos");
     if (modal) modal.classList.add("hidden");
     showLoading("doc-loading");
-    pollFaseChange(1, function() { location.reload(); });
+    pollFaseChange(1, function() { transitionReload(); });
   }
   if (currentFase === "parecer_gerando") {
     showStep(5);
     showLoading("parecer-loading");
-    pollFaseChange(5, function() { location.reload(); });
+    pollFaseChange(5, function() { transitionReload(); });
   }
 
 })();
