@@ -80,7 +80,7 @@
   <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
     <div class="flex items-center justify-between mb-3">
       <p class="text-sm font-semibold text-gray-700">Passo {{ passo_atual }} de 6</p>
-      <p class="text-xs text-gray-400" id="fase-label">{{ fase_label }}</p>
+      <p class="text-xs text-gray-400" id="fase-label">{{ processo.recorrente|default:"Novo processo" }}</p>
     </div>
     <div class="flex items-center gap-1 mb-1" id="stepper-bars">
       {% with labels="Identificação,Documentos,Admissibilidade,Tese,Parecer,Finalizar" %}
@@ -794,7 +794,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/wizard.js' %}?v=20260524b"></script>
+<script src="{% static 'js/wizard.js' %}?v=20260524c"></script>
 <script>
 (function(){
   var _pdfCollapsed = false;

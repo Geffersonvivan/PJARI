@@ -308,6 +308,52 @@ def api_confirmar_dados(request, pk):
 
     adm.save()
 
+    # ── Confronto de dados (Fase 2 da spec) ─────────────────────────────
+    # Compara dados informados pelo julgador com dados extraídos pelo Gemini.
+    # Divergência relevante (datas diferentes) → retornar alerta.
+    # O julgador pode forçar o avanço com force=true.
+    if not body.get("force"):
+        doc = processo.documentos.filter(tipo="consolidado").first()
+        gemini_raw = doc.extracao_json if doc and doc.extracao_json else {}
+        if gemini_raw:
+            from pareceres.services.service_documentos import _parse_date_br
+            divergencias = []
+
+            def _confrontar(label, valor_julgador, valor_gemini_str):
+                if not valor_julgador or not valor_gemini_str:
+                    return
+                nulos = {"nao_encontrado", "nulo", "null", "none", "n/a", ""}
+                if valor_gemini_str.lower().strip() in nulos:
+                    return
+                val_gemini = _parse_date_br(valor_gemini_str)
+                if val_gemini and val_gemini != valor_julgador:
+                    divergencias.append({
+                        "campo": label,
+                        "gemini": valor_gemini_str,
+                        "informado": valor_julgador.strftime("%d/%m/%Y"),
+                    })
+
+            _confrontar("Data da Infração", adm.data_infracao, gemini_raw.get("data_infracao", ""))
+            _confrontar("Data da Notif. Autuação", adm.data_na, gemini_raw.get("data_na", ""))
+            _confrontar("Data da Notif. Penalidade", adm.data_np, gemini_raw.get("data_np", ""))
+            _confrontar("Data Instauração", adm.data_instauracao, gemini_raw.get("data_instauracao", ""))
+
+            # Confrontar recorrente (nome)
+            gemini_recorrente = gemini_raw.get("recorrente", "").strip().upper()
+            julgador_recorrente = (processo.recorrente or "").strip().upper()
+            if gemini_recorrente and julgador_recorrente and gemini_recorrente not in {"NAO_ENCONTRADO", ""} and gemini_recorrente != julgador_recorrente:
+                divergencias.append({
+                    "campo": "Recorrente",
+                    "gemini": gemini_recorrente,
+                    "informado": julgador_recorrente,
+                })
+
+            if divergencias:
+                return JsonResponse({
+                    "divergencias": divergencias,
+                    "msg": "Foram encontradas divergências entre os dados informados e os extraídos do PDF. Confirme os dados ou corrija antes de avançar.",
+                }, status=409)
+
     processo.avancar_fase(FaseProcesso.ADMISSIBILIDADE)
 
     # Disparar cálculo de admissibilidade
@@ -349,6 +395,10 @@ def api_dados_extraidos(request, pk):
     def _fmt(d):
         return d.strftime("%d/%m/%Y") if d else ""
 
+    # Dados originais do Gemini (para confronto visual)
+    doc = processo.documentos.filter(tipo="consolidado").first()
+    gemini_raw = doc.extracao_json if doc and doc.extracao_json else {}
+
     return JsonResponse({
         "recorrente": processo.recorrente or "",
         "prazo_final": _fmt(processo.prazo_final),
@@ -360,6 +410,7 @@ def api_dados_extraidos(request, pk):
         "data_np": _fmt(adm.data_np) if adm else "",
         "data_instauracao": _fmt(adm.data_instauracao) if adm else "",
         "tipo_penalidade": adm.tipo_penalidade if adm else "",
+        "gemini_raw": gemini_raw,
     })
 
 

@@ -195,6 +195,20 @@ def execute(processo) -> ServiceResult:
     # Parse e salvar campos
     _salvar_campos(processo, adm, texto_resposta)
 
+    # Salvar dados originais do Gemini no Documento (para confronto na Fase 2)
+    doc_consolidado = docs.get("consolidado")
+    if doc_consolidado:
+        doc_consolidado.extracao_json = {
+            "recorrente": _extrair_campo(texto_resposta, "RECORRENTE"),
+            "tipo_penalidade": _extrair_campo(texto_resposta, "TIPO_PENALIDADE").lower(),
+            "data_infracao": _extrair_campo(texto_resposta, "DATA_INFRACAO"),
+            "data_na": _extrair_campo(texto_resposta, "DATA_NA"),
+            "data_np": _extrair_campo(texto_resposta, "DATA_NP"),
+            "data_instauracao": _extrair_campo(texto_resposta, "DATA_INSTAURACAO"),
+            "provider": provider,
+        }
+        doc_consolidado.save(update_fields=["extracao_json"])
+
     # Avançar fase
     processo.avancar_fase(FaseProcesso.DOCUMENTOS_EXTRAIDOS)
 

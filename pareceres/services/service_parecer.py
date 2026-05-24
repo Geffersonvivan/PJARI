@@ -213,11 +213,23 @@ def execute(processo) -> ServiceResult:
     parecer_obj.provider = "Anthropic"
     parecer_obj.save()
 
-    # Determinar resultado final
-    texto_upper = parecer_text.upper()
-    if "DEFERIDO" in texto_upper and "INDEFERIDO" not in texto_upper:
+    # Determinar resultado final — DETERMINÍSTICO pelas FLAGS do julgador
+    # DEFERIDO se: prescrição punitiva, trienal, bienal ou decadência SIM,
+    #              OU ao menos uma tese acolhida na Fase 4.
+    # INDEFERIDO caso contrário.
+    if any([
+        adm.flag_prescricao_punitiva,
+        adm.flag_prescricao_intercorrente,
+        adm.flag_prescricao_intercorrente_bienal,
+        adm.flag_decadencia,
+    ]):
         processo.resultado_final = "DEFERIDO"
-    elif "INDEFERIDO" in texto_upper:
+    elif adm.flag_tempestivo is False:
+        # Intempestivo → NÃO CONHECIDO (mérito prejudicado)
+        processo.resultado_final = "NAO_CONHECIDO"
+    elif teses and any(t.acolhida for t in teses):
+        processo.resultado_final = "DEFERIDO"
+    else:
         processo.resultado_final = "INDEFERIDO"
 
     # Avançar fase

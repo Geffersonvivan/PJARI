@@ -360,24 +360,42 @@
         data_instauracao: document.getElementById("field-data-instauracao").value,
       };
 
-      showLoading("dados-loading");
-      if (typeof hidePdfSidebar === "function") hidePdfSidebar();
+      function enviarConfirmacao(forceFlag) {
+        var payload = Object.assign({}, body);
+        if (forceFlag) payload.force = true;
+        showLoading("dados-loading");
+        if (typeof hidePdfSidebar === "function") hidePdfSidebar();
 
-      api(urls.confirmarDados, { method: "POST", body: JSON.stringify(body) })
-        .then(function(data) {
-          if (data.ok && data.task_id && data.task_id !== "sync") {
-            pollTask(data.task_id, function() { transitionReload(); }, "dados-loading");
-          } else if (data.ok) {
-            setTimeout(function() { transitionReload(); }, 500);
-          } else {
+        api(urls.confirmarDados, { method: "POST", body: JSON.stringify(payload) })
+          .then(function(data) {
+            // Divergências detectadas (HTTP 409)
+            if (data.divergencias) {
+              hideLoading("dados-loading");
+              var msg = "ATENÇÃO — Divergências entre dados informados e extraídos do PDF:\n\n";
+              data.divergencias.forEach(function(d) {
+                msg += "• " + d.campo + ": PDF=" + d.gemini + " / Informado=" + d.informado + "\n";
+              });
+              msg += "\nDeseja avançar mesmo assim? (Os dados INFORMADOS serão utilizados)";
+              if (confirm(msg)) {
+                enviarConfirmacao(true);
+              }
+              return;
+            }
+            if (data.ok && data.task_id && data.task_id !== "sync") {
+              pollTask(data.task_id, function() { transitionReload(); }, "dados-loading");
+            } else if (data.ok) {
+              setTimeout(function() { transitionReload(); }, 500);
+            } else {
+              hideLoading("dados-loading");
+              alert(data.error || "Erro ao confirmar dados.");
+            }
+          })
+          .catch(function() {
             hideLoading("dados-loading");
-            alert(data.error || "Erro ao confirmar dados.");
-          }
-        })
-        .catch(function() {
-          hideLoading("dados-loading");
-          alert("Erro de conexao.");
-        });
+            alert("Erro de conexao.");
+          });
+      }
+      enviarConfirmacao(false);
     });
   }
 

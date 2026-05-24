@@ -64,7 +64,11 @@ class Processo(models.Model):
     resultado_final = models.CharField(
         max_length=15,
         blank=True,
-        choices=[("DEFERIDO", "Deferido"), ("INDEFERIDO", "Indeferido")],
+        choices=[
+            ("DEFERIDO", "Deferido"),
+            ("INDEFERIDO", "Indeferido"),
+            ("NAO_CONHECIDO", "Não Conhecido"),
+        ],
         db_index=True,
     )
 
