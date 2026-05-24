@@ -297,20 +297,24 @@ def _tentar_document_ai(docs_dict: dict) -> dict | None:
         from pareceres.integrations.document_ai import DocumentAIClient
         client = DocumentAIClient()
         if not client.disponivel:
-            _log.info("[DOCUMENTOS] Document AI indisponível")
+            _log.warning("[DOCUMENTOS] Document AI indisponível — client não inicializou")
             return None
 
         consolidado_path = docs_dict.get("consolidado")
         if not consolidado_path:
+            _log.warning("[DOCUMENTOS] Document AI: sem path consolidado")
             return None
 
+        _log.info("[DOCUMENTOS] Document AI: iniciando OCR path=%s", consolidado_path)
         resultado = client.ocr_pdf(consolidado_path)
         if resultado and resultado.get("texto_completo"):
             _log.info("[DOCUMENTOS] Document AI OCR OK: %d páginas, confiança=%.1f%%",
                       resultado["total_paginas"], resultado["confianca_media"] * 100)
+        else:
+            _log.warning("[DOCUMENTOS] Document AI retornou vazio — resultado=%s", resultado)
         return resultado
     except Exception as e:
-        _log.error("[DOCUMENTOS] Document AI falhou: %s", e)
+        _log.error("[DOCUMENTOS] Document AI falhou: %s", e, exc_info=True)
         return None
 
 

@@ -61,17 +61,20 @@ class DocumentAIClient:
         try:
             from google.cloud import documentai_v1 as documentai
             creds = _get_credentials()
+            _log.info("[DOCAI] Credenciais: %s", "OK" if creds else "ADC (padrão)")
             opts = {"api_endpoint": f"{self.location}-documentai.googleapis.com"}
             self.client = documentai.DocumentProcessorServiceClient(
                 credentials=creds,
                 client_options=opts,
             )
+            _log.info("[DOCAI] Client inicializado — project=%s processor=%s",
+                      self.project_id, self.processor_id)
         except ImportError:
             if not DocumentAIClient._missing_warned:
-                _log.error("Pacote 'google-cloud-documentai' não instalado")
+                _log.error("[DOCAI] Pacote 'google-cloud-documentai' não instalado")
                 DocumentAIClient._missing_warned = True
         except Exception as e:
-            _log.error("Erro ao inicializar Document AI: %s", e)
+            _log.error("[DOCAI] Erro ao inicializar: %s", e, exc_info=True)
 
     @property
     def disponivel(self) -> bool:
