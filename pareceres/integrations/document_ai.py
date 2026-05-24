@@ -17,8 +17,8 @@ import time
 
 from django.core.files.storage import default_storage
 
-# Limite do Document AI para online processing
-_MAX_PAGES = 30
+# Limite do Document AI para online processing (modo padrão = 15 páginas)
+_MAX_PAGES = 15
 
 _log = logging.getLogger(__name__)
 
