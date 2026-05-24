@@ -32,6 +32,7 @@ urlpatterns = [
     # API: Passo 4 — Teses
     path("api/processo/<int:pk>/teses/", views.api_teses_dados, name="api_teses_dados"),
     path("api/processo/<int:pk>/teses/confirmar/", views.api_teses_confirmar, name="api_teses_confirmar"),
+    path("api/processo/<int:pk>/teses/reextrair/", views.api_teses_reextrair, name="api_teses_reextrair"),
 
     # API: Passo 5 — Parecer
     path("api/processo/<int:pk>/parecer/", views.api_parecer_dados, name="api_parecer_dados"),

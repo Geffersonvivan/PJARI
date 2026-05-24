@@ -18,6 +18,53 @@ from . import ServiceResult
 
 _log = logging.getLogger(__name__)
 
+# Regex para separar blocos de análise por tese (ex: "**Tese 1 –", "**Tese 2 –")
+_RE_TESE_BLOCK = re.compile(
+    r'(?=\*{0,2}Tese\s+(\d+)\s*[–\-—])',
+    re.IGNORECASE,
+)
+
+
+def _distribuir_fundamentacao(teses, analise_texto):
+    """
+    Parseia o texto de análise do Gemini e distribui cada bloco
+    à AnaliseTese correspondente pelo número da tese.
+    Se não conseguir parsear, salva tudo na primeira tese como fallback.
+    """
+    blocos = _RE_TESE_BLOCK.split(analise_texto)
+
+    # _RE_TESE_BLOCK.split produz: [preâmbulo, num1, bloco1, num2, bloco2, ...]
+    tese_map = {}
+    i = 1
+    while i < len(blocos) - 1:
+        try:
+            num = int(blocos[i])
+        except (ValueError, TypeError):
+            i += 2
+            continue
+        texto_bloco = blocos[i + 1].strip()
+        # Acumular (pode haver múltiplos blocos para a mesma tese)
+        if num in tese_map:
+            tese_map[num] += "\n\n" + texto_bloco
+        else:
+            tese_map[num] = f"**Tese {num} –" + texto_bloco
+        i += 2
+
+    if tese_map:
+        for tese in teses:
+            bloco = tese_map.get(tese.ordem, "")
+            if bloco:
+                tese.fundamentacao = bloco
+                tese.save(update_fields=["fundamentacao"])
+        _log.info("[TESES-ANALISE] Fundamentação distribuída: %s blocos para %s teses",
+                  len(tese_map), len(teses))
+    else:
+        # Fallback: salvar tudo na primeira tese
+        if teses:
+            teses[0].fundamentacao = analise_texto
+            teses[0].save(update_fields=["fundamentacao"])
+        _log.warning("[TESES-ANALISE] Não foi possível parsear blocos — fallback primeira tese")
+
 
 def execute_extracao(processo) -> ServiceResult:
     """
@@ -233,10 +280,9 @@ def execute_analise(processo) -> ServiceResult:
         _log.error("[TESES-ANALISE] Erro Gemini: %s — processo=%s", e, processo.id)
         return ServiceResult.falha(f"Erro ao analisar teses: {e}")
 
-    # Salvar análise na primeira tese (texto completo da análise cruzada)
-    if teses:
-        teses[0].fundamentacao = analise_texto
-        teses[0].save(update_fields=["fundamentacao"])
+    # Parsear análise por tese e distribuir fundamentação individualmente
+    # O Gemini gera blocos "**Tese X – Síntese..." para cada tese
+    _distribuir_fundamentacao(teses, analise_texto)
 
     # Avançar fase
     processo.avancar_fase(FaseProcesso.TESE_AGUARDANDO)

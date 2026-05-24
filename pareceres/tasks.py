@@ -71,20 +71,21 @@ def calcular_admissibilidade_task(self, processo_id):
 @shared_task(bind=True, time_limit=480, max_retries=3,
              default_retry_delay=30, acks_late=True)
 def extrair_teses_task(self, processo_id):
-    """Fase 4a: Extrai teses defensivas do PDF."""
+    """Fase 4a: Extrai teses defensivas do PDF → encadeia análise."""
     from pareceres.services.service_teses import execute_extracao
 
     try:
         processo = _get_processo(processo_id)
         result = execute_extracao(processo)
 
-        if result.ok and result.dados.get("skip_to_parecer"):
-            # Nenhuma tese → dispara parecer direto (§425-427)
-            processo.avancar_fase(FaseProcesso.PARECER)
-            gerar_parecer_task.delay(processo_id)
-            return {"chained": True, "motivo": result.dados.get("motivo")}
+        if not result.ok:
+            return _handle_result(result, self, processo_id)
 
-        return _handle_result(result, self, processo_id)
+        # Encadear análise (Vertex RAG + Perplexity + Gemini)
+        _log.info("[TASK] Extração OK → disparando análise processo=%s", processo_id)
+        analisar_teses_task.delay(processo_id)
+        return {"chained": True, "teses_count": result.dados.get("teses_count", 0)}
+
     except Exception as exc:
         _log.error("[TASK] extrair_teses erro: %s — processo=%s", exc, processo_id)
         raise self.retry(exc=exc, countdown=30 * (self.request.retries + 1))

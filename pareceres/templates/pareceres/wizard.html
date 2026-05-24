@@ -70,6 +70,7 @@
      data-url-admissibilidade-confirmar="{% url 'pareceres:api_admissibilidade_confirmar' pk=processo.pk %}"
      data-url-admissibilidade-recalcular="{% url 'pareceres:api_admissibilidade_recalcular' pk=processo.pk %}"
      data-url-teses-confirmar="{% url 'pareceres:api_teses_confirmar' pk=processo.pk %}"
+     data-url-teses-reextrair="{% url 'pareceres:api_teses_reextrair' pk=processo.pk %}"
      data-url-parecer-dados="{% url 'pareceres:api_parecer_dados' pk=processo.pk %}"
      data-url-parecer-editar="{% url 'pareceres:api_parecer_editar' pk=processo.pk %}"
      data-url-auditoria-finalizar="{% url 'pareceres:api_auditoria_finalizar' pk=processo.pk %}"
@@ -531,11 +532,16 @@
 
         <!-- Mensagem sem teses extraídas (hidden by default) -->
         <div id="teses-prejudicado" class="hidden mb-6">
-          <div class="bg-blue-50 border border-blue-200 rounded-xl px-5 py-4 flex items-start gap-3">
-            <i class="ph ph-info text-blue-600 text-xl mt-0.5"></i>
-            <div>
-              <p class="text-sm font-semibold text-blue-800">Nenhuma tese identificada automaticamente</p>
-              <p class="text-xs text-blue-600">O sistema nao identificou teses defensivas no PDF. Clique em "Confirmar e Gerar Parecer" para prosseguir com a analise sem teses acolhidas (resultado: INDEFERIDO).</p>
+          <div class="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 flex items-start gap-3">
+            <i class="ph ph-warning text-amber-600 text-xl mt-0.5"></i>
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-amber-800">Nenhuma tese identificada automaticamente</p>
+              <p class="text-xs text-amber-600 mb-3">O sistema nao identificou teses defensivas no PDF. Verifique se as paginas da defesa estao corretas e tente novamente, ou prossiga sem teses.</p>
+              <button type="button" id="btn-reextrair-teses"
+                      class="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors">
+                <i class="ph ph-arrows-clockwise"></i>
+                Tentar Novamente
+              </button>
             </div>
           </div>
         </div>
@@ -794,7 +800,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/wizard.js' %}?v=20260524c"></script>
+<script src="{% static 'js/wizard.js' %}?v=20260524d"></script>
 <script>
 (function(){
   var _pdfCollapsed = false;

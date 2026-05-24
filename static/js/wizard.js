@@ -32,6 +32,7 @@
     admissibilidadeConfirmar: root.dataset.urlAdmissibilidadeConfirmar,
     admissibilidadeRecalcular: root.dataset.urlAdmissibilidadeRecalcular,
     tesesConfirmar: root.dataset.urlTesesConfirmar,
+    tesesReextrair: root.dataset.urlTesesReextrair,
     parecerDados: root.dataset.urlParecerDados,
     parecerEditar: root.dataset.urlParecerEditar,
     auditoriaFinalizar: root.dataset.urlAuditoriaFinalizar,
@@ -141,6 +142,29 @@
         .catch(() => setTimeout(poll, 5000));
     };
     poll();
+  }
+
+  function pollFase(faseEsperada, onDone, loadingId) {
+    var startTime = Date.now();
+    var TIMEOUT_MS = 5 * 60 * 1000;
+    function check() {
+      if (Date.now() - startTime > TIMEOUT_MS) {
+        if (loadingId) hideLoading(loadingId);
+        transitionReload();
+        return;
+      }
+      api(urls.fase)
+        .then(function(data) {
+          if (data.fase === faseEsperada) {
+            if (loadingId) hideLoading(loadingId);
+            onDone();
+          } else {
+            setTimeout(check, 3000);
+          }
+        })
+        .catch(function() { setTimeout(check, 5000); });
+    }
+    check();
   }
 
   function renderMarkdown(container, md) {
@@ -640,8 +664,9 @@
             } else {
               document.querySelector("#adm-loading .text-gray-600").textContent = "Extraindo teses...";
               pollTask(data.task_id, function(result) {
-                if (result && result.chained) { transitionReload(); return; }
-                transitionReload();
+                // Extração terminou → esperar análise (que roda em background)
+                document.querySelector("#adm-loading .text-gray-600").textContent = "Analisando teses (fundamentação)...";
+                pollFase("tese_aguardando", function() { transitionReload(); }, "adm-loading");
               }, "adm-loading");
             }
           } else {
@@ -682,7 +707,7 @@
         var container = document.getElementById("teses-cards");
         var prejudicado = document.getElementById("teses-prejudicado");
 
-        if (!data.teses || data.teses.length === 0) {
+        if (!data.teses || data.teses.length === 0 || data.sem_teses) {
           if (prejudicado) prejudicado.classList.remove("hidden");
           if (container) container.innerHTML = "";
           return;
@@ -761,6 +786,37 @@
           } else {
             hideLoading("tese-loading");
             alert(data.error || "Erro ao confirmar teses.");
+          }
+        })
+        .catch(function() {
+          hideLoading("tese-loading");
+          alert("Erro de conexao.");
+        });
+    });
+  }
+
+  // Botão "Tentar Novamente" — re-dispara extração de teses
+  var btnReextrair = document.getElementById("btn-reextrair-teses");
+  if (btnReextrair) {
+    btnReextrair.addEventListener("click", function() {
+      showLoading("tese-loading");
+      document.getElementById("tese-loading-msg").textContent = "Extraindo teses...";
+
+      api(urls.tesesReextrair, { method: "POST", body: JSON.stringify({}) })
+        .then(function(data) {
+          if (data.ok) {
+            if (!data.task_id || data.task_id === "sync") {
+              setTimeout(function() { transitionReload(); }, 500);
+              return;
+            }
+            pollTask(data.task_id, function() {
+              // Extração OK → esperar análise completar
+              document.getElementById("tese-loading-msg").textContent = "Analisando teses (fundamentação)...";
+              pollFase("tese_aguardando", function() { transitionReload(); }, "tese-loading");
+            }, "tese-loading");
+          } else {
+            hideLoading("tese-loading");
+            alert(data.error || "Erro ao reextrair teses.");
           }
         })
         .catch(function() {

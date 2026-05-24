@@ -640,8 +640,10 @@ def api_admissibilidade_confirmar(request, pk):
         except Exception:
             _log.info("[ADM] Sem broker — fallback síncrono teses processo=%s", processo.id)
             try:
-                from .services.service_teses import execute_extracao
-                execute_extracao(processo)
+                from .services.service_teses import execute_extracao, execute_analise
+                result = execute_extracao(processo)
+                if result.ok:
+                    execute_analise(processo)
             except Exception as e:
                 _log.error("[ADM] Erro síncrono teses: %s", e)
             return JsonResponse({
@@ -659,7 +661,42 @@ def api_teses_dados(request, pk):
     teses = list(processo.teses.order_by("ordem").values(
         "id", "ordem", "titulo", "fundamentacao", "acolhida"
     ))
-    return JsonResponse({"teses": teses})
+    # Verificar se a tese é a genérica "nenhuma tese identificada"
+    sem_teses = (
+        len(teses) == 1
+        and "nenhuma tese" in (teses[0].get("titulo", "") or "").lower()
+        and not teses[0].get("fundamentacao")
+    )
+    return JsonResponse({"teses": teses, "sem_teses": sem_teses})
+
+
+@login_required
+@require_POST
+def api_teses_reextrair(request, pk):
+    """Re-dispara extração + análise de teses (quando a primeira tentativa falhou)."""
+    processo = get_object_or_404(Processo, pk=pk, user=request.user)
+
+    if processo.fase not in (FaseProcesso.TESE_AGUARDANDO, FaseProcesso.TESE):
+        return JsonResponse({"error": "Processo não está na fase de teses."}, status=400)
+
+    # Resetar fase para TESE e re-disparar
+    processo.fase = FaseProcesso.TESE
+    processo.save(update_fields=["fase"])
+
+    from .tasks import extrair_teses_task
+    try:
+        task = extrair_teses_task.delay(processo.id)
+        return JsonResponse({"ok": True, "task_id": task.id})
+    except Exception:
+        _log.info("[TESES] Sem broker — fallback síncrono reextração processo=%s", processo.id)
+        try:
+            from .services.service_teses import execute_extracao, execute_analise
+            result = execute_extracao(processo)
+            if result.ok:
+                execute_analise(processo)
+        except Exception as e:
+            _log.error("[TESES] Erro síncrono reextração: %s", e)
+        return JsonResponse({"ok": True, "task_id": "sync"})
 
 
 @login_required
