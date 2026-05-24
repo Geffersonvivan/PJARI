@@ -17,8 +17,8 @@ import time
 
 from django.core.files.storage import default_storage
 
-# Limite do Document AI para online processing (modo padrão = 15 páginas)
-_MAX_PAGES = 15
+# Limite do Document AI por requisição (online processing, modo padrão)
+_BATCH_SIZE = 15
 
 _log = logging.getLogger(__name__)
 
@@ -82,10 +82,10 @@ class DocumentAIClient:
 
     def ocr_pdf(self, file_path: str) -> dict | None:
         """
-        Processa PDF via Document AI OCR.
+        Processa PDF via Document AI OCR, em lotes de _BATCH_SIZE páginas.
 
-        Args:
-            file_path: Caminho do arquivo no storage (ex: "uploads/doc.pdf")
+        Suporta PDFs de qualquer tamanho — divide em blocos de 15 páginas,
+        envia cada bloco ao Document AI, e consolida os resultados.
 
         Returns:
             {
@@ -101,6 +101,7 @@ class DocumentAIClient:
             return None
 
         try:
+            import fitz  # PyMuPDF
             from google.cloud import documentai_v1 as documentai
 
             start = time.time()
@@ -109,75 +110,89 @@ class DocumentAIClient:
             with default_storage.open(file_path, "rb") as f:
                 pdf_bytes = f.read()
 
-            # Limitar a 30 páginas (limite do Document AI online processing)
-            pdf_bytes = self._truncar_pdf(pdf_bytes)
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            total_pages = len(doc)
 
             resource_name = self.client.processor_path(
                 self.project_id, self.location, self.processor_id
             )
 
-            request = documentai.ProcessRequest(
-                name=resource_name,
-                raw_document=documentai.RawDocument(
-                    content=pdf_bytes,
-                    mime_type="application/pdf",
-                ),
-                # Habilitar OCR de qualidade premium
-                process_options=documentai.ProcessOptions(
-                    ocr_config=documentai.OcrConfig(
-                        enable_native_pdf_parsing=True,
-                        hints=documentai.OcrConfig.Hints(
-                            language_hints=["pt"],
+            # Dividir em lotes de _BATCH_SIZE páginas
+            all_paginas = []
+            all_textos = []
+            all_confiancas = []
+
+            for batch_start in range(0, total_pages, _BATCH_SIZE):
+                batch_end = min(batch_start + _BATCH_SIZE, total_pages)
+                _log.info("[DOCAI] Processando lote páginas %d-%d de %d — path=%s",
+                          batch_start + 1, batch_end, total_pages, file_path)
+
+                # Extrair lote como PDF separado
+                batch_doc = fitz.open()
+                batch_doc.insert_pdf(doc, from_page=batch_start, to_page=batch_end - 1)
+                batch_bytes = batch_doc.tobytes()
+                batch_doc.close()
+
+                request = documentai.ProcessRequest(
+                    name=resource_name,
+                    raw_document=documentai.RawDocument(
+                        content=batch_bytes,
+                        mime_type="application/pdf",
+                    ),
+                    process_options=documentai.ProcessOptions(
+                        ocr_config=documentai.OcrConfig(
+                            enable_native_pdf_parsing=True,
+                            hints=documentai.OcrConfig.Hints(
+                                language_hints=["pt"],
+                            ),
                         ),
                     ),
-                ),
-            )
+                )
 
-            result = self.client.process_document(request=request)
-            document = result.document
+                result = self.client.process_document(request=request)
+                batch_document = result.document
+
+                all_textos.append(batch_document.text or "")
+
+                for i, page in enumerate(batch_document.pages):
+                    page_text = self._extrair_texto_pagina(batch_document.text, page)
+
+                    block_confidences = []
+                    for block in page.blocks:
+                        if block.layout.confidence:
+                            block_confidences.append(block.layout.confidence)
+
+                    page_conf = (
+                        sum(block_confidences) / len(block_confidences)
+                        if block_confidences else 0.0
+                    )
+                    all_confiancas.append(page_conf)
+
+                    all_paginas.append({
+                        "numero": batch_start + i + 1,
+                        "texto": page_text,
+                        "confianca": round(page_conf, 3),
+                    })
+
+            doc.close()
             latency_ms = int((time.time() - start) * 1000)
 
-            # Extrair texto e confiança por página
-            paginas = []
-            confiancas = []
-
-            for i, page in enumerate(document.pages):
-                # Texto da página
-                page_text = self._extrair_texto_pagina(document.text, page)
-
-                # Confiança média dos blocos da página
-                block_confidences = []
-                for block in page.blocks:
-                    if block.layout.confidence:
-                        block_confidences.append(block.layout.confidence)
-
-                page_conf = (
-                    sum(block_confidences) / len(block_confidences)
-                    if block_confidences else 0.0
-                )
-                confiancas.append(page_conf)
-
-                paginas.append({
-                    "numero": i + 1,
-                    "texto": page_text,
-                    "confianca": round(page_conf, 3),
-                })
-
             confianca_media = (
-                sum(confiancas) / len(confiancas) if confiancas else 0.0
+                sum(all_confiancas) / len(all_confiancas) if all_confiancas else 0.0
             )
 
             resultado = {
-                "texto_completo": document.text,
-                "paginas": paginas,
+                "texto_completo": "\n".join(all_textos),
+                "paginas": all_paginas,
                 "confianca_media": round(confianca_media, 3),
-                "total_paginas": len(paginas),
+                "total_paginas": len(all_paginas),
                 "latency_ms": latency_ms,
             }
 
             _log.info(
-                "[DOCAI] OCR OK: %d páginas, confiança=%.1f%%, latency=%dms, path=%s",
-                len(paginas), confianca_media * 100, latency_ms, file_path,
+                "[DOCAI] OCR OK: %d páginas (%d lotes), confiança=%.1f%%, latency=%dms, path=%s",
+                len(all_paginas), -(-total_pages // _BATCH_SIZE),
+                confianca_media * 100, latency_ms, file_path,
             )
 
             return resultado
@@ -185,28 +200,6 @@ class DocumentAIClient:
         except Exception as e:
             _log.error("[DOCAI] Erro OCR: %s — path=%s", e, file_path, exc_info=True)
             return None
-
-    @staticmethod
-    def _truncar_pdf(pdf_bytes: bytes) -> bytes:
-        """Trunca PDF para no máximo _MAX_PAGES páginas (limite do online processing)."""
-        try:
-            import fitz  # PyMuPDF
-            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-            if len(doc) <= _MAX_PAGES:
-                doc.close()
-                return pdf_bytes
-
-            _log.info("[DOCAI] PDF tem %d páginas, truncando para %d", len(doc), _MAX_PAGES)
-            # Criar novo PDF com apenas as primeiras _MAX_PAGES páginas
-            new_doc = fitz.open()
-            new_doc.insert_pdf(doc, to_page=_MAX_PAGES - 1)
-            out = new_doc.tobytes()
-            new_doc.close()
-            doc.close()
-            return out
-        except Exception as e:
-            _log.warning("[DOCAI] Erro ao truncar PDF: %s — enviando original", e)
-            return pdf_bytes
 
     @staticmethod
     def _extrair_texto_pagina(full_text: str, page) -> str:
