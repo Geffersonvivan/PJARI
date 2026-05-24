@@ -894,7 +894,12 @@
                 setTimeout(function() { location.reload(); }, 500);
                 return;
               }
-              pollTask(data.task_id, function() { location.reload(); }, "audit-loading");
+              pollTask(data.task_id, function(result) {
+                if (result && result.erro) {
+                  alert(result.erro);
+                }
+                location.reload();
+              }, "audit-loading");
             } else {
               hideLoading("audit-loading");
               alert(data.error || "Erro ao iniciar auditoria.");

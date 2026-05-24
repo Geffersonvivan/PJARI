@@ -868,7 +868,7 @@ class JariMathIntegracaoTest(TestCase):
 
     def test_sem_prescricao_punitiva(self):
         from pareceres.math import JariMath
-        result = JariMath.check_prescription_punitiva(
+        result, _ = JariMath.check_prescription_punitiva(
             data_infracao=datetime.date(2022, 3, 15),
             data_sessao=datetime.date(2025, 6, 15),
         )

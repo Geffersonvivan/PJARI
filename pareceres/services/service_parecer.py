@@ -124,6 +124,11 @@ def execute(processo) -> ServiceResult:
         f"- Decadência: {'SIM' if adm.flag_decadencia else 'NÃO'}\n"
     )
 
+    # ── Texto determinístico de Prescrição e Decadência (Fase 3) ────────
+    _texto_prescricao = ""
+    if adm.fundamentacoes and adm.fundamentacoes.get("texto_prescricao_decadencia"):
+        _texto_prescricao = adm.fundamentacoes["texto_prescricao_decadencia"]
+
     # ── Montar prompt ─────────────────────────────────────────────────────
     prompt_user = (
         f"DADOS DO PROCESSO:\n"
@@ -136,6 +141,8 @@ def execute(processo) -> ServiceResult:
         f"{_flags_txt}\n"
         f"ROTA: {_rota}\n\n"
         f"ADMISSIBILIDADE (análise técnica de referência):\n{_trunc(adm.texto_resultado, 10_000)}\n\n"
+        f"SEÇÃO PRESCRIÇÃO E DECADÊNCIA (TEXTO PRONTO — COPIE IPSIS LITERIS, NÃO ALTERE):\n"
+        f"{_texto_prescricao}\n\n"
         f"TESE DA DEFESA:\n{_trunc(tese_texto, 3_000)}\n\n"
         f"ANÁLISE DE TESES:\n{_trunc(analise_tese_texto, 12_000)}\n\n"
         f"RESULTADO RAG NORMATIVO (Vertex):\n{_trunc(vertex_result, 6_000)}\n\n"

@@ -93,11 +93,23 @@ class JariMath:
             aniversario = aniversario + datetime.timedelta(days=desconto_covid_dias)
 
         _prescrito = data_sessao > aniversario if data_sessao else False
+
+        # Relatório determinístico
+        intervalo = (data_sessao - ultimo_marco).days if data_sessao else 0
+        covid_txt = f" Desconto COVID: {desconto_covid_dias} dias." if desconto_covid_dias else ""
+        relatorio = (
+            f"Marco inicial = {data_infracao.strftime('%d/%m/%Y')}. "
+            f"Último marco interruptivo = {ultimo_marco.strftime('%d/%m/%Y')}. "
+            f"Intervalo até sessão ({data_sessao.strftime('%d/%m/%Y') if data_sessao else 'N/A'}) = {intervalo} dias. "
+            f"Prazo legal: 5 anos (Lei 9.873/99).{covid_txt} "
+            f"Valor calculado: {'SIM' if _prescrito else 'NÃO'}."
+        )
+
         _logger.info(
             "[JARIMATH] punitiva=%s | ultimo_marco=%s | aniversario=%s | sessao=%s | covid_dias=%s",
             _prescrito, ultimo_marco, aniversario, data_sessao, desconto_covid_dias,
         )
-        return _prescrito
+        return _prescrito, relatorio
 
     @staticmethod
     def check_prescription_intercorrente(data_protocolo, data_sessao):
@@ -150,6 +162,15 @@ class JariMath:
 
         data_protocolo = JariMath._parse_date(data_protocolo)
         data_sessao = JariMath._parse_date(data_sessao)
+
+        # Trava de segurança: art. 285, §6º c/c art. 289-A do CTB (Lei 14.229/2021)
+        # Aplica-se somente a protocolos a partir de 01/01/2024.
+        if data_protocolo < datetime.date(2024, 1, 1):
+            _logger.info(
+                "[JARIMATH] intercorrente_bienal=NAO_SE_APLICA | protocolo=%s (anterior a 01/01/2024)",
+                data_protocolo,
+            )
+            return False, "NÃO SE APLICA — protocolo anterior a 01/01/2024."
 
         # Aniversário de 2 anos (Calendário Civil)
         try:

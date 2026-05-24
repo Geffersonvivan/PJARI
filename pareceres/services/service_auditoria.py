@@ -340,8 +340,8 @@ def execute(processo) -> ServiceResult:
         if ok:
             itens_ok += 1
         else:
-            # Item 2 (resultado) é erro fatal — peso dobrado
-            if label.startswith("Resultado"):
+            # Item 2 (resultado) é erro fatal
+            if label.startswith("Compatibilidade"):
                 inconsistencias.append(detalhe)
             else:
                 advertencias.append(f"{label}: {detalhe}")
@@ -367,12 +367,6 @@ def execute(processo) -> ServiceResult:
     parecer.checklist_auditoria = checklist
     parecer.save()
 
-    # ── Bloqueio fatal ────────────────────────────────────────────────────
-    if inconsistencias:
-        _log.warning("[AUDITORIA] BLOQUEIO FATAL: processo=%s | %s", processo.id, inconsistencias)
-        # Mesmo com erro fatal, avançar para FINALIZADO para não travar o fluxo
-        # O score baixo sinaliza o problema
-
     # ── Tempo de julgamento ───────────────────────────────────────────────
     try:
         diff = (timezone.now() - processo.created_at).total_seconds()
@@ -381,6 +375,28 @@ def execute(processo) -> ServiceResult:
         tempo_str = f"{minutos:02d}m {segundos:02d}s"
     except Exception:
         tempo_str = ""
+
+    # ── Bloqueio fatal ────────────────────────────────────────────────────
+    if inconsistencias:
+        _log.warning("[AUDITORIA] BLOQUEIO FATAL: processo=%s | %s", processo.id, inconsistencias)
+
+        log_audit("fase", processo=processo, fase="auditoria_bloqueada", dados={
+            "score": score,
+            "itens_ok": itens_ok,
+            "total_itens": 10,
+            "inconsistencias": inconsistencias,
+        })
+
+        return ServiceResult.falha(
+            "BLOQUEIO: O resultado do parecer é incompatível com as flags do julgador. "
+            "Corrija o texto do parecer antes de finalizar.",
+            score=score,
+            tempo=tempo_str,
+            itens_ok=itens_ok,
+            inconsistencias=inconsistencias,
+            advertencias=advertencias,
+            checklist=checklist,
+        )
 
     # Avançar para FINALIZADO
     processo.avancar_fase(FaseProcesso.FINALIZADO)

@@ -504,7 +504,46 @@ def api_admissibilidade_confirmar(request, pk):
     adm.julgador_prescricao_intercorrente = _parse_bool(body.get("julgador_intercorrente"))
     adm.julgador_prescricao_intercorrente_bienal = _parse_bool(body.get("julgador_intercorrente_bienal"))
     adm.julgador_decadencia = _parse_bool(body.get("julgador_decadencia"))
+
+    # ── Bloqueios hard-coded (CETRAN/SC) ────────────────────────────────
+    import datetime as _dt
+    LIMIAR_FILTRO1 = _dt.date(2021, 4, 12)
+    LIMIAR_FILTRO2 = _dt.date(2021, 10, 22)
+
+    if adm.julgador_decadencia is True and adm.data_infracao:
+        # Filtro 1: infração < 12/04/2021 → decadência vedada (CETRAN/SC 381/2022)
+        if adm.data_infracao < LIMIAR_FILTRO1:
+            return JsonResponse({
+                "error": (
+                    "CONVERSÃO BLOQUEADA: Decadência não pode ser reconhecida para infrações "
+                    "anteriores a 12/04/2021 (Parecer CETRAN/SC 381/2022). "
+                    "Corrija a decisão de Decadência para NÃO."
+                )
+            }, status=400)
+
+        # Filtro 2: infração entre 12/04 e 21/10/2021 + suspensão/cassação → vedada
+        if (adm.data_infracao < LIMIAR_FILTRO2
+                and adm.tipo_penalidade
+                and adm.tipo_penalidade.lower() in ("suspensao", "cassacao")):
+            return JsonResponse({
+                "error": (
+                    "CONVERSÃO BLOQUEADA: Decadência não se aplica a penalidades de suspensão/cassação "
+                    "no período de 12/04/2021 a 21/10/2021 (Nota CETRAN/SC 02/03/2023). "
+                    "Corrija a decisão de Decadência para NÃO."
+                )
+            }, status=400)
+
     adm.save()
+
+    # ── Audit log da decisão do julgador ─────────────────────────────────
+    from .models import log_audit
+    log_audit("decisao", processo=processo, fase="admissibilidade_confirmada", dados={
+        "julgador_tempestivo": adm.julgador_tempestivo,
+        "julgador_prescricao_punitiva": adm.julgador_prescricao_punitiva,
+        "julgador_prescricao_intercorrente": adm.julgador_prescricao_intercorrente,
+        "julgador_prescricao_intercorrente_bienal": adm.julgador_prescricao_intercorrente_bienal,
+        "julgador_decadencia": adm.julgador_decadencia,
+    })
 
     # Determinar rota
     rota = adm.rota

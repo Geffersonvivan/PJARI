@@ -121,39 +121,54 @@ class TestPrescricaoIntercorrente(TestCase):
 
 class TestPrescricaoIntercorrenteBienal(TestCase):
 
-    def test_nao_prescrito_no_aniversario(self):
+    def test_protocolo_anterior_2024_nao_se_aplica(self):
+        """Trava de segurança: protocolo < 01/01/2024 → NÃO SE APLICA."""
+        protocolo = datetime.date(2023, 12, 31)
+        sessao = datetime.date(2026, 1, 1)
+        prescrito, msg = JariMath.check_prescription_intercorrente_bienal(protocolo, sessao)
+        self.assertFalse(prescrito)
+        self.assertIn("NÃO SE APLICA", msg)
+
+    def test_protocolo_2020_nao_se_aplica(self):
         protocolo = datetime.date(2020, 1, 10)
-        sessao = datetime.date(2022, 1, 10)
+        sessao = datetime.date(2022, 1, 11)
+        prescrito, msg = JariMath.check_prescription_intercorrente_bienal(protocolo, sessao)
+        self.assertFalse(prescrito)
+        self.assertIn("NÃO SE APLICA", msg)
+
+    def test_nao_prescrito_no_aniversario(self):
+        protocolo = datetime.date(2024, 1, 10)
+        sessao = datetime.date(2026, 1, 10)
         prescrito, msg = JariMath.check_prescription_intercorrente_bienal(protocolo, sessao)
         self.assertFalse(prescrito)
         self.assertEqual(msg, "Prescrição intercorrente bienal não configurada.")
 
     def test_prescrito_um_dia_apos_aniversario(self):
-        protocolo = datetime.date(2020, 1, 10)
-        sessao = datetime.date(2022, 1, 11)
+        protocolo = datetime.date(2024, 1, 10)
+        sessao = datetime.date(2026, 1, 11)
         prescrito, msg = JariMath.check_prescription_intercorrente_bienal(protocolo, sessao)
         self.assertTrue(prescrito)
         self.assertEqual(msg, "Prescrição intercorrente bienal configurada.")
 
     def test_exato_aniversario_nao_prescrito(self):
-        protocolo = datetime.date(2021, 6, 15)
-        sessao = datetime.date(2023, 6, 15)
+        protocolo = datetime.date(2024, 6, 15)
+        sessao = datetime.date(2026, 6, 15)
         prescrito, _ = JariMath.check_prescription_intercorrente_bienal(protocolo, sessao)
         self.assertFalse(prescrito)
 
     def test_um_dia_apos_aniversario_prescrito(self):
-        protocolo = datetime.date(2021, 6, 15)
-        sessao = datetime.date(2023, 6, 16)
+        protocolo = datetime.date(2024, 6, 15)
+        sessao = datetime.date(2026, 6, 16)
         prescrito, _ = JariMath.check_prescription_intercorrente_bienal(protocolo, sessao)
         self.assertTrue(prescrito)
 
     def test_29fev_bissexto_aniversario_28fev(self):
-        protocolo = datetime.date(2020, 2, 29)
-        sessao_ok = datetime.date(2022, 2, 28)
+        protocolo = datetime.date(2024, 2, 29)
+        sessao_ok = datetime.date(2026, 2, 28)
         prescrito, _ = JariMath.check_prescription_intercorrente_bienal(protocolo, sessao_ok)
         self.assertFalse(prescrito)
 
-        sessao_tarde = datetime.date(2022, 3, 1)
+        sessao_tarde = datetime.date(2026, 3, 1)
         prescrito, _ = JariMath.check_prescription_intercorrente_bienal(protocolo, sessao_tarde)
         self.assertTrue(prescrito)
 
@@ -163,10 +178,18 @@ class TestPrescricaoIntercorrenteBienal(TestCase):
         self.assertIn("Dados insuficientes", msg)
 
     def test_string_input(self):
-        prescrito, _ = JariMath.check_prescription_intercorrente_bienal("2021-01-01", "2022-12-31")
+        prescrito, _ = JariMath.check_prescription_intercorrente_bienal("2024-01-01", "2025-12-31")
         self.assertFalse(prescrito)
-        prescrito, _ = JariMath.check_prescription_intercorrente_bienal("2021-01-01", "2023-01-02")
+        prescrito, _ = JariMath.check_prescription_intercorrente_bienal("2024-01-01", "2026-01-02")
         self.assertTrue(prescrito)
+
+    def test_protocolo_exato_01_01_2024_aplica(self):
+        """Protocolo em 01/01/2024 deve aplicar a regra (não é anterior)."""
+        protocolo = datetime.date(2024, 1, 1)
+        sessao = datetime.date(2026, 1, 2)
+        prescrito, msg = JariMath.check_prescription_intercorrente_bienal(protocolo, sessao)
+        self.assertTrue(prescrito)
+        self.assertEqual(msg, "Prescrição intercorrente bienal configurada.")
 
 
 # ---------------------------------------------------------------------------
@@ -179,38 +202,46 @@ class TestPrescricaoPunitiva(TestCase):
     def test_nao_prescrito_no_aniversario(self):
         infracao = datetime.date(2016, 6, 15)
         sessao = datetime.date(2021, 6, 15)
-        self.assertFalse(JariMath.check_prescription_punitiva(infracao, sessao))
+        result, _ = JariMath.check_prescription_punitiva(infracao, sessao)
+        self.assertFalse(result)
 
     def test_prescrito_um_dia_apos_aniversario(self):
         infracao = datetime.date(2016, 6, 15)
         sessao = datetime.date(2021, 6, 16)
-        self.assertTrue(JariMath.check_prescription_punitiva(infracao, sessao))
+        result, _ = JariMath.check_prescription_punitiva(infracao, sessao)
+        self.assertTrue(result)
 
     def test_marcos_interruptivos_reinicia_contagem(self):
         infracao = datetime.date(2015, 1, 1)
         marco = datetime.date(2017, 1, 1)
         sessao = datetime.date(2021, 1, 1)
-        self.assertFalse(JariMath.check_prescription_punitiva(infracao, sessao, [marco]))
+        result, _ = JariMath.check_prescription_punitiva(infracao, sessao, [marco])
+        self.assertFalse(result)
 
     def test_prescrito_apos_5_anos_do_ultimo_marco(self):
         infracao = datetime.date(2015, 1, 1)
         marco = datetime.date(2017, 3, 10)
         sessao = datetime.date(2022, 3, 11)
-        self.assertTrue(JariMath.check_prescription_punitiva(infracao, sessao, [marco]))
+        result, _ = JariMath.check_prescription_punitiva(infracao, sessao, [marco])
+        self.assertTrue(result)
 
     def test_desconto_covid_estende_prazo(self):
         infracao = datetime.date(2015, 6, 1)
         sessao = datetime.date(2020, 6, 2)
-        self.assertTrue(JariMath.check_prescription_punitiva(infracao, sessao))
-        self.assertFalse(JariMath.check_prescription_punitiva(infracao, sessao, desconto_covid_dias=256))
+        result, _ = JariMath.check_prescription_punitiva(infracao, sessao)
+        self.assertTrue(result)
+        result, _ = JariMath.check_prescription_punitiva(infracao, sessao, desconto_covid_dias=256)
+        self.assertFalse(result)
 
     def test_29fev_bissexto(self):
         # 29/02/2016 + 5 anos → 01/03/2021 (2021 não é bissexto)
         infracao = datetime.date(2016, 2, 29)
         sessao_no_dia = datetime.date(2021, 3, 1)  # exato aniversário → NÃO prescrito
-        self.assertFalse(JariMath.check_prescription_punitiva(infracao, sessao_no_dia))
+        result, _ = JariMath.check_prescription_punitiva(infracao, sessao_no_dia)
+        self.assertFalse(result)
         sessao_depois = datetime.date(2021, 3, 2)  # dia seguinte → prescrito
-        self.assertTrue(JariMath.check_prescription_punitiva(infracao, sessao_depois))
+        result, _ = JariMath.check_prescription_punitiva(infracao, sessao_depois)
+        self.assertTrue(result)
 
     def test_multiplos_marcos_usa_mais_recente(self):
         infracao = datetime.date(2013, 1, 1)
@@ -220,17 +251,21 @@ class TestPrescricaoPunitiva(TestCase):
             datetime.date(2015, 3, 1),
         ]
         sessao_ok = datetime.date(2021, 6, 1)
-        self.assertFalse(JariMath.check_prescription_punitiva(infracao, sessao_ok, marcos))
+        result, _ = JariMath.check_prescription_punitiva(infracao, sessao_ok, marcos)
+        self.assertFalse(result)
         sessao_tarde = datetime.date(2021, 6, 2)
-        self.assertTrue(JariMath.check_prescription_punitiva(infracao, sessao_tarde, marcos))
+        result, _ = JariMath.check_prescription_punitiva(infracao, sessao_tarde, marcos)
+        self.assertTrue(result)
 
     def test_5_anos_corridos(self):
         # 01/01/2015 + 5 anos = 01/01/2020. Sessão no aniversário → NÃO prescrito.
         infracao = datetime.date(2015, 1, 1)
         sessao_aniversario = datetime.date(2020, 1, 1)
-        self.assertFalse(JariMath.check_prescription_punitiva(infracao, sessao_aniversario))
+        result, _ = JariMath.check_prescription_punitiva(infracao, sessao_aniversario)
+        self.assertFalse(result)
         sessao_apos = datetime.date(2020, 1, 2)  # dia seguinte → prescrito
-        self.assertTrue(JariMath.check_prescription_punitiva(infracao, sessao_apos))
+        result, _ = JariMath.check_prescription_punitiva(infracao, sessao_apos)
+        self.assertTrue(result)
 
 
 # ---------------------------------------------------------------------------
