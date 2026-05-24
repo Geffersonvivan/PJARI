@@ -69,7 +69,9 @@
      data-url-teses-confirmar="{% url 'pareceres:api_teses_confirmar' pk=processo.pk %}"
      data-url-parecer-dados="{% url 'pareceres:api_parecer_dados' pk=processo.pk %}"
      data-url-parecer-editar="{% url 'pareceres:api_parecer_editar' pk=processo.pk %}"
-     data-url-auditoria-finalizar="{% url 'pareceres:api_auditoria_finalizar' pk=processo.pk %}">
+     data-url-auditoria-finalizar="{% url 'pareceres:api_auditoria_finalizar' pk=processo.pk %}"
+     data-url-pastas-listar="{% url 'pareceres:api_pastas_listar' %}"
+     data-url-processo-mover="{% url 'pareceres:api_processo_mover' pk=processo.pk %}">
 
   <!-- ── PROGRESS CARD ──────────────────────── -->
   <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
@@ -94,7 +96,7 @@
        data-url-pdf-proxy="{% url 'pareceres:pdf_proxy' pk=processo.pk tipo='__TIPO__' %}">
 
     <!-- PDF Sidebar (visible from step 2 onward) -->
-    <div id="pdf-sidebar" class="{% if passo_atual < 2 %}hidden{% endif %}" style="flex:1.2;min-width:0;display:flex;flex-direction:column;">
+    <div id="pdf-sidebar" style="flex:1.2;min-width:0;{% if passo_atual == 2 %}display:flex{% else %}display:none{% endif %};flex-direction:column;">
       <div id="pdf-sidebar-expanded" class="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col flex-1 overflow-hidden">
         <!-- Tab bar -->
         <div class="flex items-center gap-1.5 bg-gray-50 px-3 py-2 border-b border-gray-100" style="border-radius:12px 12px 0 0;">
@@ -133,7 +135,7 @@
     </div>
 
     <!-- Collapsed strip -->
-    <div id="pdf-sidebar-strip" class="{% if passo_atual < 2 %}hidden{% endif %}"
+    <div id="pdf-sidebar-strip"
          style="display:none;flex:0 0 40px;cursor:pointer;"
          onclick="togglePdfCol()">
       <div class="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center h-full py-4">
@@ -764,7 +766,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/wizard.js' %}?v=20260523e"></script>
+<script src="{% static 'js/wizard.js' %}?v=20260523f"></script>
 <script>
 (function(){
   var _pdfCollapsed = false;
@@ -821,9 +823,7 @@
   var firstTab = document.querySelector('.pdf-tab');
   if (firstTab) switchPdfTab(firstTab);
 
-  // Esconder sidebar nos passos 3+ (PDF só é útil no passo 2)
-  var _passo = parseInt('{{ passo_atual }}', 10);
-  if (_passo >= 3) hidePdfSidebar();
+  // Sidebar já é controlada no template (display:none para passos != 2)
 })();
 </script>
 {% endblock %}

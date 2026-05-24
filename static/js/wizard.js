@@ -35,6 +35,8 @@
     parecerDados: root.dataset.urlParecerDados,
     parecerEditar: root.dataset.urlParecerEditar,
     auditoriaFinalizar: root.dataset.urlAuditoriaFinalizar,
+    pastasListar: root.dataset.urlPastasListar,
+    processoMover: root.dataset.urlProcessoMover,
   };
 
   // ── Helpers ────────────────────────────────────────────────────────────
@@ -45,7 +47,14 @@
       headers["Content-Type"] = "application/json";
     }
     return fetch(url, { ...opts, headers: { ...headers, ...opts.headers } })
-      .then((r) => r.json());
+      .then((r) => {
+        if (!r.ok && r.status >= 500) {
+          return r.text().then(function(t) {
+            throw new Error("Erro do servidor (" + r.status + ")");
+          });
+        }
+        return r.json();
+      });
   }
 
   function showStep(n) {
@@ -1030,16 +1039,17 @@
               console.log("[JARI] Score pendente + fase auditoria → disparando automaticamente");
               label.textContent = "Calculando...";
               selo.style.display = "";
+              showLoading("audit-loading");
               api(urls.auditoriaFinalizar, { method: "POST", body: JSON.stringify({}) })
                 .then(function(r) {
                   if (r.ok && r.task_id && r.task_id !== "sync") {
                     pollTask(r.task_id, function(res) {
                       if (res && res.erro) alert(res.erro);
                       location.reload();
-                    });
+                    }, "audit-loading");
                   } else { location.reload(); }
                 })
-                .catch(function() { location.reload(); });
+                .catch(function() { hideLoading("audit-loading"); });
               return;
             }
             colorClass = "bg-gray-50 border-gray-300";
@@ -1133,7 +1143,7 @@
   if (currentPasso === 2) loadDadosExtraidos();
   if (currentPasso === 3) loadAdmissibilidade();
   if (currentPasso === 4) loadTeses();
-  if (currentPasso === 5) loadParecer();
+  if (currentPasso === 5 && currentFase !== "parecer_gerando") loadParecer();
   if (currentPasso === 6) loadFinalizado();
 
   // ── Salvar em Pasta (passo 6) ────────────────────────────────────────────
@@ -1158,21 +1168,18 @@
         dropdownMeses.classList.add("hidden");
 
         // Buscar pasta ID pelo nome e mover processo
-        fetch("/api/pastas/")
-          .then(function(r) { return r.json(); })
+        api(urls.pastasListar)
           .then(function(data) {
             var pasta = data.pastas.find(function(p) { return p.nome === pastaNome; });
             if (!pasta) {
               alert("Pasta não encontrada. Recarregue a página.");
               return;
             }
-            return fetch("/api/processo/" + processoId + "/mover/", {
+            return api(urls.processoMover, {
               method: "POST",
-              headers: {"Content-Type": "application/json", "X-CSRFToken": csrf},
               body: JSON.stringify({pasta_id: pasta.id})
             });
           })
-          .then(function(r) { if (r) return r.json(); })
           .then(function(data) {
             if (data && data.ok) {
               btnSalvarPasta.innerHTML = '<i class="ph ph-check text-lg"></i> Salvo em ' + pastaNome.split(" - ")[1];
