@@ -2,7 +2,52 @@
 {% load static pareceres_tags %}
 {% block title %}P-JARI — Processo {{ processo.recorrente|default:"Novo" }}{% endblock %}
 
-{% block navbar %}{% endblock %}
+{% block navbar %}
+<nav class="bg-white border-b border-gray-100 sticky top-0 z-50">
+  <div class="w-full flex items-center justify-between" style="height:60px;padding-left:50px;padding-right:50px;">
+    <div class="flex items-center gap-4">
+      <a href="{% url 'pareceres:home' %}" class="flex items-center gap-3" style="text-decoration:none;">
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm"
+             style="background: linear-gradient(135deg, #4ade80, #16a34a);">
+          <i class="ph ph-scales text-white" style="font-size:18px;"></i>
+        </div>
+        <span class="font-bold text-base tracking-tight" style="color:#16a34a;">P-JARI</span>
+      </a>
+      <span style="font-size:11px;color:#d1d5db;font-weight:500;">v2.0</span>
+    </div>
+    <div class="flex items-center gap-2 text-sm">
+      {% if user.is_authenticated %}
+      {# Ícones desabilitados durante julgamento, habilitados quando finalizado #}
+      {% if processo.fase == 'finalizado' %}
+      <button onclick="abrirModalForum()" title="Fórum dos Julgadores"
+         class="flex items-center justify-center w-9 h-9 rounded-xl text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+        <i class="ph ph-chats-circle text-xl"></i>
+      </button>
+      <button onclick="abrirModalTeses()" title="Banco de Teses"
+         class="flex items-center justify-center w-9 h-9 rounded-xl text-gray-500 hover:text-purple-600 hover:bg-purple-50 transition-colors">
+        <i class="ph ph-books text-xl"></i>
+      </button>
+      {% else %}
+      <span class="flex items-center justify-center w-9 h-9 rounded-xl text-gray-300 cursor-default" title="Disponível após finalizar">
+        <i class="ph ph-chats-circle text-xl"></i>
+      </span>
+      <span class="flex items-center justify-center w-9 h-9 rounded-xl text-gray-300 cursor-default" title="Disponível após finalizar">
+        <i class="ph ph-books text-xl"></i>
+      </span>
+      {% endif %}
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl">
+        <div class="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
+          {{ user.get_full_name|default:user.username|first|upper }}
+        </div>
+        <span class="text-gray-700 font-medium hidden sm:inline text-sm">
+          {{ user.get_full_name|default:user.username }}
+        </span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</nav>
+{% endblock %}
 {% block sub_nav %}{% endblock %}
 {% block footer %}{% endblock %}
 
@@ -720,7 +765,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/wizard.js' %}?v=20260523b"></script>
+<script src="{% static 'js/wizard.js' %}?v=20260523c"></script>
 <script>
 (function(){
   var _pdfCollapsed = false;
