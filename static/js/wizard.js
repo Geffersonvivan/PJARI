@@ -189,10 +189,7 @@
 
             pollTask(data.task_id, () => {
               clearInterval(progressInterval);
-              progressBar.style.width = "100%";
-              progressPct.textContent = "100%";
-              progressMsg.textContent = "CONCLUIDO!";
-              setTimeout(() => location.reload(), 500);
+              location.reload();
             });
           } else {
             alert(data.error || "Erro no upload.");
