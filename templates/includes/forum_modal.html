@@ -172,7 +172,6 @@ async function forumCarregarPosts() {
                         <span class="text-xs text-gray-400">${_forumDateFmt(post.created_at)}</span>
                     </div>
                 </div>
-                <div class="text-sm text-gray-800 font-semibold mb-1">${_forumUrlize(post.titulo)}</div>
                 <div class="text-sm text-gray-700 leading-relaxed mb-3 whitespace-pre-wrap forum-text">${_forumUrlize(post.conteudo)}</div>
                 <div class="flex items-center gap-4 pt-3 border-t border-gray-50">
                     <button onclick="forumCurtir(${post.id})" class="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-blue-600 transition focus:outline-none" id="btn-like-${post.id}">
