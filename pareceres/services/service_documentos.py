@@ -291,8 +291,31 @@ def _salvar_campos(processo, adm, resultado: dict):
 # ── Providers ────────────────────────────────────────────────────────────────
 
 
-def _tentar_gemini(processo, docs_dict: dict) -> str | None:
-    """Tenta extração via Gemini (upload PDF nativo)."""
+def _tentar_document_ai(docs_dict: dict) -> dict | None:
+    """Tenta OCR via Document AI. Retorna resultado OCR ou None."""
+    try:
+        from pareceres.integrations.document_ai import DocumentAIClient
+        client = DocumentAIClient()
+        if not client.disponivel:
+            _log.info("[DOCUMENTOS] Document AI indisponível")
+            return None
+
+        consolidado_path = docs_dict.get("consolidado")
+        if not consolidado_path:
+            return None
+
+        resultado = client.ocr_pdf(consolidado_path)
+        if resultado and resultado.get("texto_completo"):
+            _log.info("[DOCUMENTOS] Document AI OCR OK: %d páginas, confiança=%.1f%%",
+                      resultado["total_paginas"], resultado["confianca_media"] * 100)
+        return resultado
+    except Exception as e:
+        _log.error("[DOCUMENTOS] Document AI falhou: %s", e)
+        return None
+
+
+def _tentar_gemini(processo, docs_dict: dict, texto_ocr: str | None = None) -> str | None:
+    """Tenta extração via Gemini. Se tem texto OCR, usa texto em vez de PDF."""
     try:
         from pareceres.integrations.gemini import GeminiClient
         gemini = GeminiClient()
@@ -300,40 +323,62 @@ def _tentar_gemini(processo, docs_dict: dict) -> str | None:
             _log.warning("[DOCUMENTOS] Gemini sem API key configurada")
             return None
 
-        consolidado_path = docs_dict.get("consolidado")
-        if not consolidado_path:
-            return None
-
-        _log.info("[DOCUMENTOS] Gemini upload PDF processo=%s", processo.id)
         start = time.time()
-        uploaded = gemini.upload_file(consolidado_path)
-        if not uploaded:
-            _log.error("[DOCUMENTOS] Gemini upload falhou processo=%s", processo.id)
-            return None
 
-        _log.info("[DOCUMENTOS] Gemini generate processo=%s", processo.id)
-        response, model_used = gemini.generate(
-            model="gemini-2.0-flash",
-            contents=[uploaded, PROMPT_EXTRACAO_F2],
-            config={"temperature": 0.1, "max_output_tokens": 1024},
-        )
+        if texto_ocr:
+            # Usar texto OCR do Document AI (mais preciso, sem custo de upload)
+            _log.info("[DOCUMENTOS] Gemini com texto OCR processo=%s", processo.id)
+            contents = [
+                f"TEXTO EXTRAÍDO DO PDF VIA OCR:\n\n{texto_ocr[:50000]}",
+                PROMPT_EXTRACAO_F2,
+            ]
+            response, model_used = gemini.generate(
+                model="gemini-2.0-flash",
+                contents=contents,
+                config={"temperature": 0.1, "max_output_tokens": 1024},
+            )
+        else:
+            # Fallback: upload PDF nativo
+            consolidado_path = docs_dict.get("consolidado")
+            if not consolidado_path:
+                return None
+
+            _log.info("[DOCUMENTOS] Gemini upload PDF processo=%s", processo.id)
+            uploaded = gemini.upload_file(consolidado_path)
+            if not uploaded:
+                _log.error("[DOCUMENTOS] Gemini upload falhou processo=%s", processo.id)
+                return None
+
+            _log.info("[DOCUMENTOS] Gemini generate processo=%s", processo.id)
+            response, model_used = gemini.generate(
+                model="gemini-2.0-flash",
+                contents=[uploaded, PROMPT_EXTRACAO_F2],
+                config={"temperature": 0.1, "max_output_tokens": 1024},
+            )
 
         texto = response.text if response else None
         gemini.log_usage(processo, response, "Extração F2", model_used, start)
 
         if texto:
-            _log.info("[DOCUMENTOS] Gemini OK processo=%s modelo=%s", processo.id, model_used)
+            _log.info("[DOCUMENTOS] Gemini OK processo=%s modelo=%s (ocr=%s)",
+                      processo.id, model_used, bool(texto_ocr))
         return texto
     except Exception as e:
         _log.error("[DOCUMENTOS] Gemini falhou: %s", e, exc_info=True)
         return None
 
 
-def _tentar_anthropic(processo, docs_dict: dict) -> str | None:
-    """Tenta extração via Anthropic (PDF→JPEG→Claude) — fallback."""
+def _tentar_anthropic(processo, docs_dict: dict, texto_ocr: str | None = None) -> str | None:
+    """Tenta extração via Anthropic. Se tem texto OCR, usa texto em vez de imagens."""
     try:
         from pareceres.integrations.anthropic import AnthropicClient
         client = AnthropicClient()
+
+        if texto_ocr:
+            # Usar texto OCR (mais barato, sem converter PDF→JPEG)
+            _log.info("[DOCUMENTOS] Anthropic com texto OCR processo=%s", processo.id)
+            return client.extract_from_text(processo, texto_ocr, PROMPT_EXTRACAO_F2)
+
         return client.extract_documentos(processo, docs_dict, PROMPT_EXTRACAO_F2)
     except Exception as e:
         _log.error("[DOCUMENTOS] Anthropic falhou: %s", e)
@@ -364,12 +409,19 @@ def execute(processo) -> ServiceResult:
 
     docs_dict = {tipo: d.arquivo.name for tipo, d in docs.items() if d.arquivo}
 
+    # ── Camada 0: OCR via Document AI (quando disponível) ──────────────
+    ocr_resultado = _tentar_document_ai(docs_dict)
+    texto_ocr = ocr_resultado["texto_completo"] if ocr_resultado else None
+    if texto_ocr:
+        _log.info("[DOCUMENTOS] OCR Document AI disponível (%d chars, confiança=%.1f%%)",
+                  len(texto_ocr), ocr_resultado["confianca_media"] * 100)
+
     # ── Camada 1: Extração Gemini ───────────────────────────────────────
-    texto_gemini = _tentar_gemini(processo, docs_dict)
+    texto_gemini = _tentar_gemini(processo, docs_dict, texto_ocr=texto_ocr)
     resultado_gemini = _parse_resposta_llm(texto_gemini) if texto_gemini else None
 
     # ── Camada 2: Extração Claude (para consenso ou fallback) ───────────
-    texto_claude = _tentar_anthropic(processo, docs_dict)
+    texto_claude = _tentar_anthropic(processo, docs_dict, texto_ocr=texto_ocr)
     resultado_claude = _parse_resposta_llm(texto_claude) if texto_claude else None
 
     # ── Camada 3: Consenso ou fallback ──────────────────────────────────
@@ -409,6 +461,10 @@ def execute(processo) -> ServiceResult:
         extracao_json["confianca"][campo.lower()] = info.get("confianca", "MEDIA")
 
     # Salvar respostas brutas para auditoria
+    if ocr_resultado:
+        extracao_json["ocr_confianca"] = ocr_resultado["confianca_media"]
+        extracao_json["ocr_paginas"] = ocr_resultado["total_paginas"]
+        extracao_json["ocr_latency_ms"] = ocr_resultado["latency_ms"]
     if texto_gemini:
         extracao_json["raw_gemini"] = texto_gemini[:2000]
     if texto_claude:

@@ -35,6 +35,9 @@ stripe>=10.0
 weasyprint>=62.0
 PyMuPDF>=1.24
 
+# OCR (Document AI)
+google-cloud-documentai>=2.0
+
 # Utils
 python-dotenv>=1.0
 requests>=2.32

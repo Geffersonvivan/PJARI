@@ -1,6 +1,13 @@
 #!/bin/bash
 set -e
 
+# GCP credentials from env var (Document AI, GCS)
+if [ -n "$GCP_CREDENTIALS_JSON" ]; then
+  echo "$GCP_CREDENTIALS_JSON" > /app/gcp-credentials.json
+  export GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
+  echo "GCP credentials written to /app/gcp-credentials.json"
+fi
+
 echo "Running migrations..."
 python3 manage.py migrate --noinput
 

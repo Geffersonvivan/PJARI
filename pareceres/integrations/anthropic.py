@@ -206,6 +206,46 @@ class AnthropicClient:
             _log.error("[ANTHROPIC] Erro extração: %s — processo=%s", e, processo.id)
             return None
 
+    def extract_from_text(self, processo, texto_ocr: str, prompt: str) -> str | None:
+        """Extrai campos usando texto OCR pré-processado (sem enviar imagens)."""
+        if not self.client:
+            return None
+
+        content = f"TEXTO EXTRAÍDO DO PDF VIA OCR:\n\n{texto_ocr[:50000]}\n\n{prompt}"
+
+        try:
+            start_time = time.time()
+
+            def _call():
+                return self.client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=1024,
+                    messages=[{"role": "user", "content": content}],
+                )
+
+            response = _retry_on_rate_limit(_call)
+            latency_ms = int((time.time() - start_time) * 1000)
+
+            from pareceres.models import log_audit
+            log_audit(
+                "ia_request",
+                processo=processo,
+                fase="Extração F2 (OCR text)",
+                provider="Anthropic",
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens,
+                latency_ms=latency_ms,
+                model_name="claude-sonnet-4-20250514",
+            )
+
+            texto = response.content[0].text
+            _log.info("[ANTHROPIC] Extração OCR text OK processo=%s tokens_in=%d latency=%dms",
+                      processo.id, response.usage.input_tokens, latency_ms)
+            return texto
+        except Exception as e:
+            _log.error("[ANTHROPIC] Erro extração OCR text: %s — processo=%s", e, processo.id)
+            return None
+
     def get_pdf_content(self, file_path) -> dict | None:
         """Codifica PDF em base64 para envio ao Claude."""
         if not file_path:
