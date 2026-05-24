@@ -51,7 +51,7 @@ class DocumentAIClient:
     _missing_warned = False
 
     def __init__(self):
-        self.project_id = os.environ.get("GCP_PROJECT_ID", "206144381877")
+        self.project_id = os.environ.get("GCP_PROJECT_ID", "the-experience-497319-f7")
         self.location = os.environ.get("DOCAI_LOCATION", "us")
         self.processor_id = os.environ.get("DOCAI_PROCESSOR_ID", "47e3d6dedb9ae505")
         self.client = None
