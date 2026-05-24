@@ -419,15 +419,21 @@
       var autoText = _admResultText(cfg, autoVal);
       var fund = admFundamentacoes[cfg.fundKey] || "";
 
-      // Modelo relativo: A = CONFIRMAR resultado, B = AFASTAR (inverter)
+      // Modelo relativo: A = CONFIRMAR resultado auto, B = AFASTAR (inverter)
+      // Confirmar = aceitar autoVal, Afastar = inverso do autoVal
+      var confirmVal = autoVal === true ? "true" : autoVal === false ? "false" : "";
+      var afastarVal = autoVal === true ? "false" : autoVal === false ? "true" : "";
+
       // Pre-select: se julgador já decidiu
       var selectedA = false, selectedB = false;
-      if (jVal === true) selectedA = true;
-      else if (jVal === false) selectedB = true;
+      if (jVal !== null && jVal !== undefined) {
+        if (jVal === autoVal) selectedA = true;
+        else selectedB = true;
+      }
 
       // Mapear a decisão: confirmar = mesmo valor do auto, afastar = inverso
-      if (selectedA) admDecisions[cfg.bodyKey] = "true";
-      else if (selectedB) admDecisions[cfg.bodyKey] = "false";
+      if (selectedA) admDecisions[cfg.bodyKey] = confirmVal;
+      else if (selectedB) admDecisions[cfg.bodyKey] = afastarVal;
 
       // Detectar se é inversão (julgador diverge do auto)
       var isInvertido = (jVal !== null && jVal !== undefined && jVal !== autoVal);
@@ -453,12 +459,12 @@
 
       // Radio cards: A = CONFIRMAR, B = AFASTAR
       html += '    <div class="radio-grid">';
-      html += '      <div class="radio-card' + (selectedA ? ' selected' : '') + '" onclick="selectAdmCard(this,\'' + cfg.bodyKey + '\',\'true\',\'' + cfg.key + '\')">';
+      html += '      <div class="radio-card' + (selectedA ? ' selected' : '') + '" onclick="selectAdmCard(this,\'' + cfg.bodyKey + '\',\'' + confirmVal + '\',\'' + cfg.key + '\')">';
       html += '        <div class="radio-dot"></div>';
       html += '        <span class="radio-card-label"><i class="ph ph-check-circle"></i> Confirmar</span>';
       html += '        <span class="radio-card-sub">Manter resultado tecnico</span>';
       html += '      </div>';
-      html += '      <div class="radio-card' + (selectedB ? ' selected' : '') + '" onclick="selectAdmCard(this,\'' + cfg.bodyKey + '\',\'false\',\'' + cfg.key + '\')">';
+      html += '      <div class="radio-card' + (selectedB ? ' selected' : '') + '" onclick="selectAdmCard(this,\'' + cfg.bodyKey + '\',\'' + afastarVal + '\',\'' + cfg.key + '\')">';
       html += '        <div class="radio-dot"></div>';
       html += '        <span class="radio-card-label"><i class="ph ph-arrows-counter-clockwise"></i> Afastar</span>';
       html += '        <span class="radio-card-sub">Inverter decisao do julgador</span>';
