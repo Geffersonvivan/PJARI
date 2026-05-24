@@ -223,7 +223,17 @@ def execute(processo) -> ServiceResult:
         )
 
     # 3.3 Prescrição intercorrente bienal
-    if adm.has_prescricao_intercorrente_bienal:
+    _bienal_nao_se_aplica = "NÃO SE APLICA" in relatorio_inter_bienal
+
+    if _bienal_nao_se_aplica:
+        texto_33 = (
+            "A prescrição intercorrente bienal do artigo 285, parágrafo 6º, combinado com o artigo "
+            "289-A do Código de Trânsito Brasileiro não se aplica ao presente caso. O protocolo do "
+            f"recurso ocorreu em {_fmt(processo.data_protocolo)}, anteriormente a 01/01/2024, data a "
+            "partir da qual a Lei 14.229/2021 passou a produzir efeitos para fins de contagem do prazo "
+            "bienal. Análise prejudicada."
+        )
+    elif adm.has_prescricao_intercorrente_bienal:
         texto_33 = (
             f"A prescrição intercorrente bienal do artigo 285, parágrafo 6º, combinado com o artigo "
             f"289-A do Código de Trânsito Brasileiro configurou-se pelo transcurso de dois anos "

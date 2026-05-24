@@ -135,7 +135,7 @@ def execute(processo) -> ServiceResult:
         f"PA: {processo.pa}\n"
         f"SGPE: {processo.sgpe}\n"
         f"Recorrente: {processo.recorrente}\n"
-        f"Data da Sessão: {processo.data_sessao}\n"
+        f"Data da Sessão: {processo.data_sessao.strftime('%d/%m/%Y') if processo.data_sessao else 'N/A'}\n"
         f"Relator: {relator_name}\n\n"
         f"FLAGS DO JULGADOR (resultado escolhido — PREVALECEM sobre qualquer cálculo automático):\n"
         f"{_flags_txt}\n"
