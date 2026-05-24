@@ -151,7 +151,8 @@
     <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 flex flex-col flex-1 relative" id="wizard-panel" style="min-width:0;">
 
     <!-- PASSO 1: Upload do Consolidado (modal) -->
-    <div class="wizard-step flex-1 flex items-center justify-center {% if passo_atual != 1 %}hidden{% endif %}" data-step="1">
+    {% if passo_atual == 1 %}
+    <div class="wizard-step flex-1 flex items-center justify-center" data-step="1">
 
       <!-- Modal backdrop -->
       <div class="fixed inset-0 z-50 flex items-center justify-center p-4" id="modal-documentos">
@@ -283,9 +284,11 @@
       </div>
 
     </div>
+    {% endif %}
 
     <!-- PASSO 2: Dados Extraídos (revisão + data_sessao) -->
-    <div class="wizard-step flex-1 {% if passo_atual != 2 %}hidden{% endif %}" data-step="2">
+    {% if passo_atual == 2 %}
+    <div class="wizard-step flex-1" data-step="2">
       <div class="max-w-2xl mx-auto">
 
         <!-- Banner -->
@@ -446,9 +449,11 @@
         <p class="text-gray-600 font-medium">Calculando admissibilidade...</p>
       </div>
     </div>
+    {% endif %}
 
     <!-- PASSO 3: Admissibilidade -->
-    <div class="wizard-step flex-1 {% if passo_atual != 3 %}hidden{% endif %}" data-step="3">
+    {% if passo_atual == 3 %}
+    <div class="wizard-step flex-1" data-step="3">
       <div class="max-w-3xl mx-auto">
         <div class="text-center mb-6">
           <h2 class="text-xl font-bold text-gray-900 mb-2">Admissibilidade</h2>
@@ -513,9 +518,11 @@
         <p class="text-gray-400 text-xs mt-1">Isso pode levar alguns segundos</p>
       </div>
     </div>
+    {% endif %}
 
     <!-- PASSO 4: Tese -->
-    <div class="wizard-step flex-1 {% if passo_atual != 4 %}hidden{% endif %}" data-step="4">
+    {% if passo_atual == 4 %}
+    <div class="wizard-step flex-1" data-step="4">
       <div class="max-w-3xl mx-auto">
         <div class="text-center mb-6">
           <h2 class="text-xl font-bold text-gray-900 mb-2">Analise de Teses</h2>
@@ -546,9 +553,11 @@
         <p class="text-gray-600 font-medium" id="tese-loading-msg">Analisando teses...</p>
       </div>
     </div>
+    {% endif %}
 
     <!-- PASSO 5: Parecer -->
-    <div class="wizard-step flex-1 {% if passo_atual != 5 %}hidden{% endif %}" data-step="5">
+    {% if passo_atual == 5 %}
+    <div class="wizard-step flex-1" data-step="5">
       <div class="max-w-3xl mx-auto">
         <div class="text-center mb-6">
           <h2 class="text-xl font-bold text-gray-900 mb-2">Parecer Tecnico</h2>
@@ -597,9 +606,11 @@
         <p class="text-gray-400 text-sm mt-1">Isso pode levar alguns minutos.</p>
       </div>
     </div>
+    {% endif %}
 
     <!-- PASSO 6: Finalizar -->
-    <div class="wizard-step flex-1 {% if passo_atual != 6 %}hidden{% endif %}" data-step="6">
+    {% if passo_atual == 6 %}
+    <div class="wizard-step flex-1" data-step="6">
       <div class="max-w-4xl mx-auto">
 
         <!-- ── Header: JariMatch + Tempo ── -->
@@ -704,6 +715,7 @@
         <p class="text-gray-600 font-medium">Auditando parecer...</p>
       </div>
     </div>
+    {% endif %}
 
   </div><!-- /.wizard-panel -->
 
@@ -782,7 +794,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/wizard.js' %}?v=20260523g"></script>
+<script src="{% static 'js/wizard.js' %}?v=20260524a"></script>
 <script>
 (function(){
   var _pdfCollapsed = false;
