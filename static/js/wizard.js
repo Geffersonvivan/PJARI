@@ -1025,6 +1025,23 @@
           var colorClass, iconClass, statusText, pulseClass;
 
           if (score === null || score === undefined) {
+            // Auto-disparar auditoria se ainda não foi calculada
+            if (currentFase === "auditoria") {
+              console.log("[JARI] Score pendente + fase auditoria → disparando automaticamente");
+              label.textContent = "Calculando...";
+              selo.style.display = "";
+              api(urls.auditoriaFinalizar, { method: "POST", body: JSON.stringify({}) })
+                .then(function(r) {
+                  if (r.ok && r.task_id && r.task_id !== "sync") {
+                    pollTask(r.task_id, function(res) {
+                      if (res && res.erro) alert(res.erro);
+                      location.reload();
+                    });
+                  } else { location.reload(); }
+                })
+                .catch(function() { location.reload(); });
+              return;
+            }
             colorClass = "bg-gray-50 border-gray-300";
             iconClass = "ph ph-shield text-gray-400";
             statusText = "Auditoria pendente";
