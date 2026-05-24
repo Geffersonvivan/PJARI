@@ -67,10 +67,19 @@
       headers["Content-Type"] = "application/json";
     }
     return fetch(url, { ...opts, headers: { ...headers, ...opts.headers } })
-      .then((r) => {
-        if (!r.ok && r.status >= 500) {
-          return r.text().then(function(t) {
-            throw new Error("Erro do servidor (" + r.status + ")");
+      .then(function(r) {
+        if (!r.ok) {
+          return r.text().then(function(body) {
+            var msg;
+            try { msg = JSON.parse(body).error; } catch(e) {}
+            if (!msg) {
+              if (r.status === 403) msg = "Sessao expirada ou CSRF invalido. Recarregue a pagina.";
+              else if (r.status === 413) msg = "Arquivo muito grande.";
+              else msg = "Erro " + r.status + ": " + (body || "").substring(0, 200);
+            }
+            var err = new Error(msg);
+            err.status = r.status;
+            throw err;
           });
         }
         return r.json();
@@ -219,7 +228,7 @@
             setTimeout(check, 3000);
           }
         })
-        .catch(function() { setTimeout(check, 5000); });
+        .catch(function(e) { setTimeout(check, 5000); });
     }
     check();
   }
@@ -313,8 +322,8 @@
             transitionReload();
           }
         })
-        .catch(() => {
-          alert("Erro de conexao.");
+        .catch((e) => {
+          alert(e && e.message ? e.message : "Erro de conexao.");
           transitionReload();
         });
   }
@@ -342,7 +351,7 @@
           } else {
             alert("Texto copiado não é uma data válida (DD/MM/AAAA):\n" + text);
           }
-        }).catch(function() {
+        }).catch(function(e) {
           alert("Não foi possível acessar a área de transferência.\nPermita o acesso ao clipboard.");
         });
       });
@@ -477,9 +486,9 @@
               alert(data.error || "Erro ao confirmar dados.");
             }
           })
-          .catch(function() {
+          .catch(function(e) {
             hideLoading("dados-loading");
-            alert("Erro de conexao.");
+            alert(e && e.message ? e.message : "Erro de conexao.");
           });
       }
       enviarConfirmacao(false);
@@ -519,7 +528,7 @@
           if (btnConfirmar) btnConfirmar.classList.add("hidden");
         }
       })
-      .catch(function() {});
+      .catch(function(e) {});
   }
 
   function _admResultText(cfg, autoVal) {
@@ -674,7 +683,7 @@
           if (data.error) { alert(data.error); return; }
           transitionReload();
         })
-        .catch(function() { alert("Erro de conexao."); });
+        .catch(function(e) { alert(e && e.message ? e.message : "Erro de conexao."); });
     });
   }
 
@@ -695,9 +704,9 @@
             alert(data.error || "Erro ao recalcular admissibilidade.");
           }
         })
-        .catch(function() {
+        .catch(function(e) {
           hideLoading("adm-loading");
-          alert("Erro de conexao.");
+          alert(e && e.message ? e.message : "Erro de conexao.");
         });
     });
   }
@@ -745,9 +754,9 @@
             alert(data.error || "Erro ao confirmar admissibilidade.");
           }
         })
-        .catch(function() {
+        .catch(function(e) {
           hideLoading("adm-loading");
-          alert("Erro de conexao.");
+          alert(e && e.message ? e.message : "Erro de conexao.");
         });
       }
       enviarAdm(false);
@@ -826,7 +835,7 @@
 
         container.innerHTML = html;
       })
-      .catch(function() {});
+      .catch(function(e) {});
   }
 
   function escapeHtml(str) {
@@ -870,9 +879,9 @@
               alert(data.error || "Erro ao confirmar teses.");
             }
           })
-          .catch(function() {
+          .catch(function(e) {
             hideLoading("tese-loading");
-            alert("Erro de conexao.");
+            alert(e && e.message ? e.message : "Erro de conexao.");
           });
       }
       enviarTeses(false);
@@ -903,9 +912,9 @@
             alert(data.error || "Erro ao reextrair teses.");
           }
         })
-        .catch(function() {
+        .catch(function(e) {
           hideLoading("tese-loading");
-          alert("Erro de conexao.");
+          alert(e && e.message ? e.message : "Erro de conexao.");
         });
     });
   }
@@ -1050,7 +1059,7 @@
           }
         }
       })
-      .catch(function() {});
+      .catch(function(e) {});
   }
 
   // Toggle editor
@@ -1113,9 +1122,9 @@
               alert(data.error || "Erro ao iniciar auditoria.");
             }
           })
-          .catch(function() {
+          .catch(function(e) {
             hideLoading("audit-loading");
-            alert("Erro de conexao.");
+            alert(e && e.message ? e.message : "Erro de conexao.");
           });
       }
 
@@ -1129,7 +1138,7 @@
               alert(saveData.error || "Erro ao salvar edicoes do parecer.");
             }
           })
-          .catch(function() {
+          .catch(function(e) {
             hideLoading("audit-loading");
             alert("Erro ao salvar edicoes.");
           });
@@ -1176,7 +1185,7 @@
             alert(data.error || "Erro ao salvar.");
           }
         })
-        .catch(function() { alert("Erro de conexao."); });
+        .catch(function(e) { alert(e && e.message ? e.message : "Erro de conexao."); });
     });
   }
 
@@ -1233,7 +1242,7 @@
                     }, "audit-loading");
                   } else { transitionReload(); }
                 })
-                .catch(function() { hideLoading("audit-loading"); });
+                .catch(function(e) { hideLoading("audit-loading"); });
               return;
             }
             colorClass = "bg-gray-50 border-gray-300";
@@ -1319,7 +1328,7 @@
           }
         }
       })
-      .catch(function() {});
+      .catch(function(e) {});
   }
 
   // ── Init: carregar dados do passo atual ─────────────────────────────────
