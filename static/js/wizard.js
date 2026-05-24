@@ -810,7 +810,7 @@
     btnAll.className = "px-3 py-1.5 text-xs font-medium rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition flex items-center gap-1 ml-auto";
     btnAll.innerHTML = '<i class="ph ph-copy-simple" style="font-size:13px;"></i> Copiar Tudo';
     btnAll.addEventListener("click", function() {
-      var text = container.innerText || container.textContent || "";
+      var text = parecerTextoOriginal || container.innerText || container.textContent || "";
       navigator.clipboard.writeText(text.trim()).then(function() {
         btnAll.innerHTML = '<i class="ph ph-check" style="font-size:13px;color:#16a34a;"></i> Copiado!';
         setTimeout(function() {
@@ -984,13 +984,19 @@
 
   // ── Passo 6: Finalizado ────────────────────────────────────────────────
 
+  function _stripCabecalho(texto) {
+    // Remove bloco cabeçalho (PARECER JARI...RESULTADO:...) — exibição inicia na EMENTA
+    return texto.replace(/^\s*\*?\*?PARECER JARI\*?\*?[\s\S]*?\*?\*?RESULTADO:\*?\*?\s*(?:DEFERIDO|INDEFERIDO)\s*/i, "").trim();
+  }
+
   function loadFinalizado() {
     api(urls.parecerDados)
       .then(function(data) {
-        // Parecer final
+        // Parecer final (sem cabeçalho na exibição)
         if (data.texto) {
           parecerTextoOriginal = data.texto;
-          renderMarkdown(document.getElementById("parecer-final"), data.texto);
+          var textoExibicao = _stripCabecalho(data.texto);
+          renderMarkdown(document.getElementById("parecer-final"), textoExibicao);
           injectCopyButtons("parecer-final");
           var editorFinal = document.getElementById("parecer-editor-final");
           if (editorFinal) editorFinal.value = data.texto;
