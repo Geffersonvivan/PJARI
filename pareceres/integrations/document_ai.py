@@ -8,6 +8,7 @@ Responsabilidades:
 Usa o processor Document OCR pré-treinado (suporte a 200+ idiomas, incluindo pt-BR).
 """
 
+import io
 import json
 import logging
 import os
@@ -15,6 +16,9 @@ import tempfile
 import time
 
 from django.core.files.storage import default_storage
+
+# Limite do Document AI para online processing
+_MAX_PAGES = 30
 
 _log = logging.getLogger(__name__)
 
@@ -102,8 +106,9 @@ class DocumentAIClient:
             with default_storage.open(file_path, "rb") as f:
                 pdf_bytes = f.read()
 
-            # Limitar a 15 páginas (limit do online processing)
-            # Para PDFs maiores, seria necessário batch processing
+            # Limitar a 30 páginas (limite do Document AI online processing)
+            pdf_bytes = self._truncar_pdf(pdf_bytes)
+
             resource_name = self.client.processor_path(
                 self.project_id, self.location, self.processor_id
             )
@@ -177,6 +182,28 @@ class DocumentAIClient:
         except Exception as e:
             _log.error("[DOCAI] Erro OCR: %s — path=%s", e, file_path, exc_info=True)
             return None
+
+    @staticmethod
+    def _truncar_pdf(pdf_bytes: bytes) -> bytes:
+        """Trunca PDF para no máximo _MAX_PAGES páginas (limite do online processing)."""
+        try:
+            import fitz  # PyMuPDF
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            if len(doc) <= _MAX_PAGES:
+                doc.close()
+                return pdf_bytes
+
+            _log.info("[DOCAI] PDF tem %d páginas, truncando para %d", len(doc), _MAX_PAGES)
+            # Criar novo PDF com apenas as primeiras _MAX_PAGES páginas
+            new_doc = fitz.open()
+            new_doc.insert_pdf(doc, to_page=_MAX_PAGES - 1)
+            out = new_doc.tobytes()
+            new_doc.close()
+            doc.close()
+            return out
+        except Exception as e:
+            _log.warning("[DOCAI] Erro ao truncar PDF: %s — enviando original", e)
+            return pdf_bytes
 
     @staticmethod
     def _extrair_texto_pagina(full_text: str, page) -> str:
