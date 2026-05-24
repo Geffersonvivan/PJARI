@@ -545,27 +545,59 @@
   var admDecisions = {};
   var admFundamentacoes = {};
 
+  var _admPollTimer = null;
+
   function loadAdmissibilidade() {
     var baseUrl = urls.admissibilidadeConfirmar.replace("/confirmar/", "/");
     api(baseUrl)
       .then(function(data) {
+        var btnConfirmar = document.getElementById("btn-confirmar-adm");
+        var avisoCalc = document.getElementById("adm-calculando");
+
+        // Cálculo ainda não concluiu (fase = ADMISSIBILIDADE, não ADMISSIBILIDADE_AGUARDANDO)
+        if (data.aguardando === false) {
+          // Se já tem texto, mostra erro de falha; senão, é cálculo em andamento — poll
+          if (data.texto || data.tabela) {
+            // Cálculo falhou — mostrar erro
+            var erroDiv = document.getElementById("adm-erro");
+            if (erroDiv) {
+              document.getElementById("adm-erro-msg").textContent =
+                "O calculo de admissibilidade nao foi concluido. Verifique os dados extraidos ou tente recalcular.";
+              erroDiv.classList.remove("hidden");
+            }
+            if (btnConfirmar) btnConfirmar.classList.add("hidden");
+            if (avisoCalc) avisoCalc.classList.add("hidden");
+          } else {
+            // Cálculo em andamento — manter aviso visível e poll a cada 3s
+            if (btnConfirmar) { btnConfirmar.disabled = true; }
+            if (avisoCalc) avisoCalc.classList.remove("hidden");
+            if (!_admPollTimer) {
+              _admPollTimer = setInterval(function() { loadAdmissibilidade(); }, 3000);
+            }
+          }
+          return;
+        }
+
+        // Cálculo concluído — parar polling e habilitar botão
+        if (_admPollTimer) { clearInterval(_admPollTimer); _admPollTimer = null; }
+        if (avisoCalc) avisoCalc.classList.add("hidden");
+        if (btnConfirmar) { btnConfirmar.disabled = false; btnConfirmar.classList.remove("hidden"); }
+
         if (data.tabela) renderMarkdown(document.getElementById("adm-tabela"), data.tabela);
         if (data.texto) renderMarkdown(document.getElementById("adm-resultado"), data.texto);
         admFundamentacoes = data.fundamentacoes || {};
         renderAdmCards(data.flags || {}, data.julgador || {});
-
-        if (data.aguardando === false) {
-          var erroDiv = document.getElementById("adm-erro");
-          var btnConfirmar = document.getElementById("btn-confirmar-adm");
-          if (erroDiv) {
-            document.getElementById("adm-erro-msg").textContent =
-              "O calculo de admissibilidade nao foi concluido. Verifique os dados extraidos ou tente recalcular.";
-            erroDiv.classList.remove("hidden");
-          }
-          if (btnConfirmar) btnConfirmar.classList.add("hidden");
-        }
       })
-      .catch(function(e) {});
+      .catch(function(e) {
+        // 404 = Admissibilidade ainda não existe — poll
+        var avisoCalc = document.getElementById("adm-calculando");
+        var btnConfirmar = document.getElementById("btn-confirmar-adm");
+        if (btnConfirmar) { btnConfirmar.disabled = true; }
+        if (avisoCalc) avisoCalc.classList.remove("hidden");
+        if (!_admPollTimer) {
+          _admPollTimer = setInterval(function() { loadAdmissibilidade(); }, 3000);
+        }
+      });
   }
 
   function _admResultText(cfg, autoVal) {
