@@ -3,7 +3,11 @@ Service Fase 2 — Extração de dados do PDF consolidado via LLM.
 
 Extrai nome do recorrente, tipo de penalidade, datas do processo.
 
-Provider: Gemini (upload PDF nativo) com fallback Anthropic (PDF→JPEG→Claude)
+Pipeline de extração (4 camadas de assertividade):
+1. Prompt melhorado com few-shot + confiança por campo
+2. Consenso multi-modelo (Gemini + Claude) — divergências = confiança rebaixada
+3. Validação cruzada de datas (regras temporais)
+4. Confidence score salvo por campo → UI mostra verde/amarelo/vermelho
 """
 
 import datetime
@@ -20,25 +24,68 @@ _log = logging.getLogger(__name__)
 # ── Prompt de extração ──────────────────────────────────────────────────────
 
 PROMPT_EXTRACAO_F2 = (
-    "Analise o PDF de um processo de infração de trânsito e extraia APENAS os campos abaixo.\n"
-    "Para datas use SEMPRE o formato DD/MM/AAAA. Se não encontrar um campo, escreva NAO_ENCONTRADO.\n\n"
-    "RECORRENTE: (nome completo do recorrente/autuado em MAIÚSCULAS)\n"
-    "TIPO_PENALIDADE: (multa/advertencia/suspensao/cassacao/nao_determinado)\n"
-    "INFRACAO_DOCUMENTO: (descrição curta da infração no AIT)\n"
-    "DATA_INFRACAO: (data da infração/cometimento no AIT, formato DD/MM/AAAA)\n"
-    "DATA_NA: (data da Notificação de Autuação, formato DD/MM/AAAA)\n"
-    "DATA_NP: (data da Notificação de Penalidade, formato DD/MM/AAAA)\n"
-    "DATA_INSTAURACAO: (data de instauração do processo administrativo, formato DD/MM/AAAA)\n\n"
-    "Responda SOMENTE com as 7 linhas acima, sem nenhum outro texto."
+    "Você é um especialista em documentos de trânsito brasileiros (AIT, NA, NP, recurso JARI).\n"
+    "Analise o PDF de um processo de infração de trânsito e extraia os campos abaixo.\n\n"
+    "REGRAS:\n"
+    "- Datas SEMPRE no formato DD/MM/AAAA.\n"
+    "- Se não encontrar um campo com certeza, escreva NAO_ENCONTRADO.\n"
+    "- Para cada campo, informe o nível de CONFIANÇA: ALTA, MEDIA ou BAIXA.\n"
+    "  - ALTA: campo encontrado com texto claro e inequívoco no documento.\n"
+    "  - MEDIA: campo inferido pelo contexto ou com leitura parcialmente legível.\n"
+    "  - BAIXA: campo ambíguo, múltiplas datas candidatas, ou texto borrado.\n\n"
+    "DICAS PARA IDENTIFICAR CADA DATA:\n"
+    "- DATA_INFRACAO: aparece no AIT (Auto de Infração) como 'Data da Infração', "
+    "'Data/Hora da Infração', 'Cometimento'. É a data mais antiga.\n"
+    "- DATA_NA: aparece na Notificação de Autuação como 'Data da Notificação', "
+    "'Expedição da NA', 'Notificado em'. Vem DEPOIS da infração.\n"
+    "- DATA_NP: aparece na Notificação de Penalidade como 'Data da Notificação de Penalidade', "
+    "'Imposição de Penalidade', 'Expedição da NP'. Vem DEPOIS da NA.\n"
+    "- DATA_INSTAURACAO: aparece no recurso/requerimento como 'Data de Instauração', "
+    "'Protocolo do Recurso', 'Data de Abertura'. Geralmente é próxima ou igual à DATA_NP.\n\n"
+    "EXEMPLO DE RESPOSTA:\n"
+    "RECORRENTE: JOSE DA SILVA SANTOS | CONFIANCA: ALTA\n"
+    "TIPO_PENALIDADE: multa | CONFIANCA: ALTA\n"
+    "INFRACAO_DOCUMENTO: Avançar o sinal vermelho do semáforo (art. 208 CTB) | CONFIANCA: ALTA\n"
+    "DATA_INFRACAO: 15/03/2022 | CONFIANCA: ALTA\n"
+    "DATA_NA: 20/04/2022 | CONFIANCA: MEDIA\n"
+    "DATA_NP: NAO_ENCONTRADO | CONFIANCA: BAIXA\n"
+    "DATA_INSTAURACAO: 10/06/2022 | CONFIANCA: ALTA\n\n"
+    "CAMPOS PARA EXTRAIR (responda SOMENTE com as 7 linhas, sem nenhum outro texto):\n"
+    "RECORRENTE: (nome completo do recorrente/autuado em MAIÚSCULAS) | CONFIANCA: (ALTA/MEDIA/BAIXA)\n"
+    "TIPO_PENALIDADE: (multa/advertencia/suspensao/cassacao/nao_determinado) | CONFIANCA: (ALTA/MEDIA/BAIXA)\n"
+    "INFRACAO_DOCUMENTO: (descrição curta da infração no AIT) | CONFIANCA: (ALTA/MEDIA/BAIXA)\n"
+    "DATA_INFRACAO: (data da infração/cometimento no AIT, DD/MM/AAAA) | CONFIANCA: (ALTA/MEDIA/BAIXA)\n"
+    "DATA_NA: (data da Notificação de Autuação, DD/MM/AAAA) | CONFIANCA: (ALTA/MEDIA/BAIXA)\n"
+    "DATA_NP: (data da Notificação de Penalidade, DD/MM/AAAA) | CONFIANCA: (ALTA/MEDIA/BAIXA)\n"
+    "DATA_INSTAURACAO: (data de instauração do processo, DD/MM/AAAA) | CONFIANCA: (ALTA/MEDIA/BAIXA)\n"
 )
 
+_NULOS = {"nulo", "null", "none", "n/a", "não encontrado", "nao encontrado",
+           "não localizado", "nao localizado", "nao_se_aplica", "nao_encontrado", ""}
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+_CAMPOS_DATA = ("DATA_INFRACAO", "DATA_NA", "DATA_NP", "DATA_INSTAURACAO")
+_CAMPOS_TEXTO = ("RECORRENTE", "TIPO_PENALIDADE", "INFRACAO_DOCUMENTO")
+
+
+# ── Helpers de parse ────────────────────────────────────────────────────────
 
 
 def _extrair_campo(texto_resposta: str, label: str) -> str:
+    """Extrai valor do campo, removendo o sufixo | CONFIANCA: se presente."""
     m = re.search(rf'{label}:\s*(.+)', texto_resposta, re.IGNORECASE)
-    return m.group(1).strip() if m else ""
+    if not m:
+        return ""
+    val = m.group(1).strip()
+    # Remover sufixo de confiança
+    val = re.sub(r'\s*\|\s*CONFIAN[CÇ]A\s*:\s*(ALTA|MEDIA|BAIXA)\s*$', '', val, flags=re.IGNORECASE)
+    return val.strip()
+
+
+def _extrair_confianca(texto_resposta: str, label: str) -> str:
+    """Extrai nível de confiança (ALTA/MEDIA/BAIXA) de um campo."""
+    m = re.search(rf'{label}:\s*.+\|\s*CONFIAN[CÇ]A\s*:\s*(ALTA|MEDIA|BAIXA)',
+                  texto_resposta, re.IGNORECASE)
+    return m.group(1).upper() if m else "MEDIA"
 
 
 def _parse_date_br(s: str):
@@ -52,26 +99,170 @@ def _parse_date_br(s: str):
         return None
 
 
-def _salvar_campos(processo, adm, texto_resposta: str):
-    """Parse e salva nome do recorrente, tipo de penalidade e datas extraídas."""
-    recorrente = _extrair_campo(texto_resposta, "RECORRENTE")
-    tipo_penalidade = _extrair_campo(texto_resposta, "TIPO_PENALIDADE").lower()
-    infracao_doc = _extrair_campo(texto_resposta, "INFRACAO_DOCUMENTO")
-    data_infracao = _extrair_campo(texto_resposta, "DATA_INFRACAO")
-    data_na = _extrair_campo(texto_resposta, "DATA_NA")
-    data_np = _extrair_campo(texto_resposta, "DATA_NP")
-    data_instauracao = _extrair_campo(texto_resposta, "DATA_INSTAURACAO")
+def _parse_resposta_llm(texto_resposta: str) -> dict:
+    """
+    Parse completo da resposta LLM.
+    Retorna dict com valor e confiança por campo:
+    {"DATA_INFRACAO": {"valor": "22/01/2022", "confianca": "ALTA"}, ...}
+    """
+    resultado = {}
+    for label in list(_CAMPOS_DATA) + list(_CAMPOS_TEXTO):
+        valor = _extrair_campo(texto_resposta, label)
+        confianca = _extrair_confianca(texto_resposta, label)
+        resultado[label] = {"valor": valor, "confianca": confianca}
+    return resultado
 
-    _log.info("[DOCUMENTOS] Campos extraidos processo=%s: recorrente=%r tipo=%r infracao=%r "
-              "data_infracao=%r data_na=%r data_np=%r data_inst=%r",
-              processo.id, recorrente, tipo_penalidade, infracao_doc,
-              data_infracao, data_na, data_np, data_instauracao)
 
-    _nulos = {"nulo", "null", "none", "n/a", "não encontrado", "nao encontrado",
-              "não localizado", "nao localizado", "nao_se_aplica", "nao_encontrado", ""}
+# ── Consenso multi-modelo ───────────────────────────────────────────────────
+
+
+def _consenso(resultado_a: dict, resultado_b: dict, provider_a: str, provider_b: str) -> dict:
+    """
+    Compara resultados de 2 modelos. Quando concordam → ALTA.
+    Quando divergem → rebaixa confiança e loga a divergência.
+    Prioriza o resultado com confiança mais alta.
+    """
+    resultado_final = {}
+    divergencias = []
+
+    for campo in list(_CAMPOS_DATA) + list(_CAMPOS_TEXTO):
+        a = resultado_a.get(campo, {"valor": "", "confianca": "BAIXA"})
+        b = resultado_b.get(campo, {"valor": "", "confianca": "BAIXA"})
+
+        val_a = a["valor"].strip().lower()
+        val_b = b["valor"].strip().lower()
+
+        # Normalizar nulos
+        is_nulo_a = val_a in _NULOS
+        is_nulo_b = val_b in _NULOS
+
+        if is_nulo_a and is_nulo_b:
+            # Ambos não encontraram
+            resultado_final[campo] = {"valor": "", "confianca": "BAIXA"}
+        elif is_nulo_a and not is_nulo_b:
+            # Apenas B encontrou
+            resultado_final[campo] = {"valor": b["valor"], "confianca": "MEDIA"}
+        elif not is_nulo_a and is_nulo_b:
+            # Apenas A encontrou
+            resultado_final[campo] = {"valor": a["valor"], "confianca": "MEDIA"}
+        elif val_a == val_b:
+            # Concordam — confiança é a maior dos dois
+            melhor = "ALTA" if "ALTA" in (a["confianca"], b["confianca"]) else a["confianca"]
+            resultado_final[campo] = {"valor": a["valor"], "confianca": melhor}
+        else:
+            # Divergem — usar o de maior confiança, rebaixar
+            ordem = {"ALTA": 3, "MEDIA": 2, "BAIXA": 1}
+            if ordem.get(a["confianca"], 0) >= ordem.get(b["confianca"], 0):
+                escolhido = a
+                preterido = b
+                fonte = provider_a
+            else:
+                escolhido = b
+                preterido = a
+                fonte = provider_b
+
+            # Rebaixar confiança por divergência
+            nova_confianca = "MEDIA" if escolhido["confianca"] == "ALTA" else "BAIXA"
+            resultado_final[campo] = {"valor": escolhido["valor"], "confianca": nova_confianca}
+            divergencias.append({
+                "campo": campo,
+                "valor_escolhido": escolhido["valor"],
+                "valor_preterido": preterido["valor"],
+                "fonte": fonte,
+            })
+
+    if divergencias:
+        _log.warning("[CONSENSO] Divergências encontradas: %s", divergencias)
+
+    return resultado_final
+
+
+# ── Validação cruzada de datas ──────────────────────────────────────────────
+
+
+def _validar_datas(resultado: dict) -> dict:
+    """
+    Aplica regras temporais e rebaixa confiança de campos inconsistentes.
+    Regras:
+    - Todas as datas devem estar entre 2000 e hoje+30 dias
+    - data_infracao <= data_na <= data_np
+    - data_instauracao >= data_np (geralmente)
+    - Intervalos absurdos (>10 anos entre campos) → suspeito
+    """
+    hoje = datetime.date.today()
+    limite_min = datetime.date(2000, 1, 1)
+    limite_max = hoje + datetime.timedelta(days=30)
+
+    # Parsear datas
+    datas = {}
+    for campo in _CAMPOS_DATA:
+        info = resultado.get(campo, {})
+        parsed = _parse_date_br(info.get("valor", ""))
+        datas[campo] = parsed
+
+    alertas = []
+
+    # Regra 1: Datas dentro de range razoável
+    for campo, dt in datas.items():
+        if dt and (dt < limite_min or dt > limite_max):
+            alertas.append(f"{campo} fora do range ({dt})")
+            resultado[campo]["confianca"] = "BAIXA"
+
+    # Regra 2: Ordem cronológica — infração <= NA <= NP
+    di = datas.get("DATA_INFRACAO")
+    dna = datas.get("DATA_NA")
+    dnp = datas.get("DATA_NP")
+    dinst = datas.get("DATA_INSTAURACAO")
+
+    if di and dna and di > dna:
+        alertas.append(f"DATA_INFRACAO ({di}) > DATA_NA ({dna})")
+        # Rebaixar ambas
+        resultado["DATA_INFRACAO"]["confianca"] = _rebaixar(resultado["DATA_INFRACAO"]["confianca"])
+        resultado["DATA_NA"]["confianca"] = _rebaixar(resultado["DATA_NA"]["confianca"])
+
+    if dna and dnp and dna > dnp:
+        alertas.append(f"DATA_NA ({dna}) > DATA_NP ({dnp})")
+        resultado["DATA_NA"]["confianca"] = _rebaixar(resultado["DATA_NA"]["confianca"])
+        resultado["DATA_NP"]["confianca"] = _rebaixar(resultado["DATA_NP"]["confianca"])
+
+    if di and dnp and di > dnp:
+        alertas.append(f"DATA_INFRACAO ({di}) > DATA_NP ({dnp})")
+        resultado["DATA_INFRACAO"]["confianca"] = _rebaixar(resultado["DATA_INFRACAO"]["confianca"])
+
+    # Regra 3: Intervalos absurdos (>10 anos)
+    if di and dnp:
+        delta = (dnp - di).days
+        if delta > 3650:
+            alertas.append(f"Intervalo infração→NP = {delta} dias (>10 anos)")
+            resultado["DATA_INFRACAO"]["confianca"] = _rebaixar(resultado["DATA_INFRACAO"]["confianca"])
+            resultado["DATA_NP"]["confianca"] = _rebaixar(resultado["DATA_NP"]["confianca"])
+
+    if alertas:
+        _log.warning("[VALIDACAO_DATAS] Alertas: %s", alertas)
+
+    return resultado
+
+
+def _rebaixar(confianca: str) -> str:
+    """ALTA → MEDIA, MEDIA → BAIXA, BAIXA → BAIXA."""
+    if confianca == "ALTA":
+        return "MEDIA"
+    return "BAIXA"
+
+
+# ── Salvar campos ──────────────────────────────────────────────────────────
+
+
+def _salvar_campos(processo, adm, resultado: dict):
+    """Salva campos extraídos (já processados por consenso + validação)."""
+    recorrente = resultado.get("RECORRENTE", {}).get("valor", "")
+    tipo_penalidade = resultado.get("TIPO_PENALIDADE", {}).get("valor", "").lower()
+    infracao_doc = resultado.get("INFRACAO_DOCUMENTO", {}).get("valor", "")
+
+    _log.info("[DOCUMENTOS] Salvando campos processo=%s: %s", processo.id, resultado)
 
     # Salvar no Processo
-    if recorrente and recorrente.lower() not in _nulos:
+    if recorrente and recorrente.lower() not in _NULOS:
         processo.recorrente = recorrente[:255].upper()
         processo.save(update_fields=["recorrente"])
 
@@ -79,25 +270,20 @@ def _salvar_campos(processo, adm, texto_resposta: str):
     if tipo_penalidade in ("multa", "advertencia", "suspensao", "cassacao"):
         adm.tipo_penalidade = tipo_penalidade
 
-    if infracao_doc and infracao_doc.lower() not in _nulos:
+    if infracao_doc and infracao_doc.lower() not in _NULOS:
         adm.infracao_documento = infracao_doc[:255]
 
-    # Datas extraídas pela LLM
-    parsed = _parse_date_br(data_infracao)
-    if parsed:
-        adm.data_infracao = parsed
-
-    parsed = _parse_date_br(data_na)
-    if parsed:
-        adm.data_na = parsed
-
-    parsed = _parse_date_br(data_np)
-    if parsed:
-        adm.data_np = parsed
-
-    parsed = _parse_date_br(data_instauracao)
-    if parsed:
-        adm.data_instauracao = parsed
+    # Datas
+    for campo, attr in [
+        ("DATA_INFRACAO", "data_infracao"),
+        ("DATA_NA", "data_na"),
+        ("DATA_NP", "data_np"),
+        ("DATA_INSTAURACAO", "data_instauracao"),
+    ]:
+        valor = resultado.get(campo, {}).get("valor", "")
+        parsed = _parse_date_br(valor)
+        if parsed:
+            setattr(adm, attr, parsed)
 
     adm.save()
 
@@ -159,7 +345,11 @@ def _tentar_anthropic(processo, docs_dict: dict) -> str | None:
 
 def execute(processo) -> ServiceResult:
     """
-    Extrai nome do recorrente do PDF consolidado.
+    Extrai dados do PDF consolidado com pipeline de alta assertividade:
+    1. Extração via Gemini (primary) + Claude (secondary)
+    2. Consenso multi-modelo (quando ambos disponíveis)
+    3. Validação cruzada de datas
+    4. Confidence score por campo
 
     Pré-condição: processo na fase DOCUMENTOS ou DOCUMENTOS_EXTRAINDO.
     Pós-condição: processo na fase DOCUMENTOS_EXTRAIDOS, Admissibilidade criada/atualizada.
@@ -174,46 +364,67 @@ def execute(processo) -> ServiceResult:
 
     docs_dict = {tipo: d.arquivo.name for tipo, d in docs.items() if d.arquivo}
 
-    # Extração via Gemini (PDF nativo) → fallback Anthropic
-    texto_resposta = _tentar_gemini(processo, docs_dict)
-    provider = "Gemini"
+    # ── Camada 1: Extração Gemini ───────────────────────────────────────
+    texto_gemini = _tentar_gemini(processo, docs_dict)
+    resultado_gemini = _parse_resposta_llm(texto_gemini) if texto_gemini else None
 
-    if not texto_resposta:
-        _log.info("[DOCUMENTOS] Gemini indisponível, tentando Anthropic processo=%s", processo.id)
-        texto_resposta = _tentar_anthropic(processo, docs_dict)
+    # ── Camada 2: Extração Claude (para consenso ou fallback) ───────────
+    texto_claude = _tentar_anthropic(processo, docs_dict)
+    resultado_claude = _parse_resposta_llm(texto_claude) if texto_claude else None
+
+    # ── Camada 3: Consenso ou fallback ──────────────────────────────────
+    if resultado_gemini and resultado_claude:
+        _log.info("[DOCUMENTOS] Consenso multi-modelo processo=%s", processo.id)
+        resultado = _consenso(resultado_gemini, resultado_claude, "Gemini", "Anthropic")
+        provider = "Consenso (Gemini+Anthropic)"
+    elif resultado_gemini:
+        resultado = resultado_gemini
+        provider = "Gemini"
+    elif resultado_claude:
+        resultado = resultado_claude
         provider = "Anthropic"
-
-    if not texto_resposta:
+    else:
         return ServiceResult.falha(
             "Não foi possível processar nenhum documento. "
             "Verifique se os arquivos são PDFs válidos."
         )
 
-    _log.info("[DOCUMENTOS] Resposta LLM processo=%s provider=%s:\n%s",
-              processo.id, provider, texto_resposta[:1000])
+    _log.info("[DOCUMENTOS] Resultado pré-validação processo=%s provider=%s: %s",
+              processo.id, provider, resultado)
 
-    # Parse e salvar campos
-    _salvar_campos(processo, adm, texto_resposta)
+    # ── Camada 4: Validação cruzada de datas ────────────────────────────
+    resultado = _validar_datas(resultado)
 
-    # Salvar dados originais do Gemini no Documento (para confronto na Fase 2)
+    # ── Salvar campos e confiança ───────────────────────────────────────
+    _salvar_campos(processo, adm, resultado)
+
+    # Montar extracao_json com confiança por campo
+    extracao_json = {
+        "provider": provider,
+        "confianca": {},
+    }
+    for campo in list(_CAMPOS_DATA) + list(_CAMPOS_TEXTO):
+        info = resultado.get(campo, {})
+        extracao_json[campo.lower()] = info.get("valor", "")
+        extracao_json["confianca"][campo.lower()] = info.get("confianca", "MEDIA")
+
+    # Salvar respostas brutas para auditoria
+    if texto_gemini:
+        extracao_json["raw_gemini"] = texto_gemini[:2000]
+    if texto_claude:
+        extracao_json["raw_anthropic"] = texto_claude[:2000]
+
     doc_consolidado = docs.get("consolidado")
     if doc_consolidado:
-        doc_consolidado.extracao_json = {
-            "recorrente": _extrair_campo(texto_resposta, "RECORRENTE"),
-            "tipo_penalidade": _extrair_campo(texto_resposta, "TIPO_PENALIDADE").lower(),
-            "data_infracao": _extrair_campo(texto_resposta, "DATA_INFRACAO"),
-            "data_na": _extrair_campo(texto_resposta, "DATA_NA"),
-            "data_np": _extrair_campo(texto_resposta, "DATA_NP"),
-            "data_instauracao": _extrair_campo(texto_resposta, "DATA_INSTAURACAO"),
-            "provider": provider,
-        }
+        doc_consolidado.extracao_json = extracao_json
         doc_consolidado.save(update_fields=["extracao_json"])
 
     # Avançar fase
     processo.avancar_fase(FaseProcesso.DOCUMENTOS_EXTRAIDOS)
 
     log_audit("fase", processo=processo, fase="documentos_extraidos",
-              dados={"provider": provider, "docs_processados": list(docs_dict.keys())})
+              dados={"provider": provider, "docs_processados": list(docs_dict.keys()),
+                     "confianca": extracao_json.get("confianca", {})})
 
     _log.info("[DOCUMENTOS] OK processo=%s provider=%s docs=%s",
               processo.id, provider, list(docs_dict.keys()))

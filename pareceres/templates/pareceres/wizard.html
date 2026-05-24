@@ -325,6 +325,7 @@
             <div>
               <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
                 Recorrente
+                <span id="conf-recorrente" class="conf-badge hidden"></span>
               </label>
               <input type="text" name="recorrente" id="field-recorrente"
                      placeholder="Nome do recorrente"
@@ -372,12 +373,19 @@
               <i class="ph ph-info text-blue-500 text-lg flex-shrink-0"></i>
               <span class="text-sm text-blue-700">Confira as informações abaixo extraídas do PDF</span>
             </div>
+            <div id="provider-badge" class="hidden mb-3">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-600">
+                <i class="ph ph-brain text-sm"></i>
+                <span id="provider-label"></span>
+              </span>
+            </div>
             <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Datas extraidas do PDF</p>
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
                   Data da Infracao
                   <span class="text-orange-400 text-[10px] font-normal">— obrigatorio</span>
+                  <span id="conf-data-infracao" class="conf-badge hidden"></span>
                 </label>
                 <div class="relative">
                   <input type="date" name="data_infracao" id="field-data-infracao"
@@ -391,6 +399,7 @@
               <div>
                 <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
                   Data da Notif. Autuação
+                  <span id="conf-data-na" class="conf-badge hidden"></span>
                 </label>
                 <div class="relative">
                   <input type="date" name="data_na" id="field-data-na"
@@ -404,6 +413,7 @@
               <div>
                 <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
                   Data da Notif. Penalidade
+                  <span id="conf-data-np" class="conf-badge hidden"></span>
                 </label>
                 <div class="relative">
                   <input type="date" name="data_np" id="field-data-np"
@@ -417,6 +427,7 @@
               <div>
                 <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
                   Data Instauracao
+                  <span id="conf-data-instauracao" class="conf-badge hidden"></span>
                 </label>
                 <div class="relative">
                   <input type="date" name="data_instauracao" id="field-data-instauracao"
@@ -768,6 +779,25 @@
   .btn-colar-data:hover { color: #2563eb; background: #eff6ff; }
   .btn-colar-data.ok { color: #16a34a; }
 
+  /* Badges de confiança da extração */
+  .conf-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 9px; font-weight: 600; padding: 1px 6px;
+    border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.03em;
+    margin-left: 4px; vertical-align: middle;
+  }
+  .conf-badge::before {
+    content: ''; display: inline-block;
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+  .conf-alta { background: #dcfce7; color: #166534; }
+  .conf-alta::before { background: #22c55e; }
+  .conf-media { background: #fef9c3; color: #854d0e; }
+  .conf-media::before { background: #eab308; }
+  .conf-baixa { background: #fee2e2; color: #991b1b; }
+  .conf-baixa::before { background: #ef4444; animation: pulse-dot 1.5s infinite; }
+  @keyframes pulse-dot { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+
   /* Wizard: full viewport, no page scroll, steps scroll internally */
   html, body { height: 100%; margin: 0; overflow: hidden; }
   main { min-height: 0 !important; }
@@ -823,7 +853,7 @@
 </div>
 
 {% block extra_js %}
-<script src="{% static 'js/wizard.js' %}?v=20260524f"></script>
+<script src="{% static 'js/wizard.js' %}?v=20260524g"></script>
 <script>
 (function(){
   var _pdfCollapsed = false;

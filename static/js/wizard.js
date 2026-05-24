@@ -400,6 +400,25 @@
           if (ds) ds.value = brDateToIso(data.data_sessao);
         }
 
+        // Confidence badges
+        if (data.confianca) {
+          setConfidenceBadge("recorrente", data.confianca.recorrente);
+          setConfidenceBadge("data-infracao", data.confianca.data_infracao);
+          setConfidenceBadge("data-na", data.confianca.data_na);
+          setConfidenceBadge("data-np", data.confianca.data_np);
+          setConfidenceBadge("data-instauracao", data.confianca.data_instauracao);
+        }
+
+        // Provider badge
+        if (data.provider) {
+          var provBadge = document.getElementById("provider-badge");
+          var provLabel = document.getElementById("provider-label");
+          if (provBadge && provLabel) {
+            provLabel.textContent = data.provider;
+            provBadge.classList.remove("hidden");
+          }
+        }
+
         initDatePaste();
       })
       .catch(() => {});
@@ -413,6 +432,24 @@
   function setExtractedDateField(name, brDate) {
     var field = document.getElementById("field-" + name);
     if (field) field.value = brDateToIso(brDate);
+  }
+
+  function setConfidenceBadge(fieldName, nivel) {
+    var badge = document.getElementById("conf-" + fieldName);
+    if (!badge) return;
+    var n = (nivel || "MEDIA").toUpperCase();
+    badge.className = "conf-badge";
+    if (n === "ALTA") {
+      badge.classList.add("conf-alta");
+      badge.textContent = "alta";
+    } else if (n === "MEDIA") {
+      badge.classList.add("conf-media");
+      badge.textContent = "media";
+    } else {
+      badge.classList.add("conf-baixa");
+      badge.textContent = "baixa";
+    }
+    badge.classList.remove("hidden");
   }
 
   var formDados = document.getElementById("form-dados-extraidos");

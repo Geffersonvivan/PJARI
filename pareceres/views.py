@@ -402,9 +402,10 @@ def api_dados_extraidos(request, pk):
     def _fmt(d):
         return d.strftime("%d/%m/%Y") if d else ""
 
-    # Dados originais do Gemini (para confronto visual)
+    # Dados originais da extração (para confronto visual e confiança)
     doc = processo.documentos.filter(tipo="consolidado").first()
-    gemini_raw = doc.extracao_json if doc and doc.extracao_json else {}
+    extracao = doc.extracao_json if doc and doc.extracao_json else {}
+    confianca = extracao.get("confianca", {})
 
     return JsonResponse({
         "recorrente": processo.recorrente or "",
@@ -417,7 +418,15 @@ def api_dados_extraidos(request, pk):
         "data_np": _fmt(adm.data_np) if adm else "",
         "data_instauracao": _fmt(adm.data_instauracao) if adm else "",
         "tipo_penalidade": adm.tipo_penalidade if adm else "",
-        "gemini_raw": gemini_raw,
+        "gemini_raw": extracao,
+        "confianca": {
+            "recorrente": confianca.get("recorrente", "MEDIA"),
+            "data_infracao": confianca.get("data_infracao", "MEDIA"),
+            "data_na": confianca.get("data_na", "MEDIA"),
+            "data_np": confianca.get("data_np", "MEDIA"),
+            "data_instauracao": confianca.get("data_instauracao", "MEDIA"),
+        },
+        "provider": extracao.get("provider", ""),
     })
 
 
