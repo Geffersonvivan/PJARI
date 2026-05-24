@@ -89,7 +89,14 @@
 
   function pollTask(taskId, onDone, loadingId) {
     const url = urls.taskStatus.replace("__TASK__", taskId);
+    const startTime = Date.now();
+    const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos
     const poll = () => {
+      if (Date.now() - startTime > TIMEOUT_MS) {
+        if (loadingId) hideLoading(loadingId);
+        alert("Tempo limite excedido. Recarregue a página e tente novamente.");
+        return;
+      }
       api(url)
         .then((data) => {
           if (data.status === "SUCCESS") {
@@ -97,7 +104,8 @@
             onDone(data.result);
           } else if (data.status === "FAILURE") {
             if (loadingId) hideLoading(loadingId);
-            alert("Erro no processamento. Tente novamente.");
+            var msg = (data.result && data.result.erro) ? data.result.erro : "Erro no processamento. Tente novamente.";
+            alert(msg);
           } else {
             setTimeout(poll, 3000);
           }

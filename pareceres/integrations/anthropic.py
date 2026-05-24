@@ -95,7 +95,10 @@ class AnthropicClient:
         try:
             from anthropic import Anthropic
             if self.api_key:
-                self.client = Anthropic(api_key=self.api_key)
+                self.client = Anthropic(
+                    api_key=self.api_key,
+                    timeout=120.0,  # 120s max per request
+                )
             else:
                 self.client = None
                 if not AnthropicClient._missing_warned:

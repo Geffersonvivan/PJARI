@@ -308,6 +308,7 @@ def execute(processo) -> ServiceResult:
         f"Gere o RESULTADO FINAL conforme as regras do SYSTEM."
     )
 
+    _log.info("[ADMISSIBILIDADE] JariMath OK, chamando Anthropic... processo=%s", processo.id)
     anthropic = AnthropicClient()
     texto_ia = anthropic.generate_text(
         processo, prompt_user,
@@ -316,6 +317,8 @@ def execute(processo) -> ServiceResult:
         temperature=0.2,
         fase_label="Admissibilidade F3",
     )
+    _log.info("[ADMISSIBILIDADE] Anthropic retornou (has_text=%s) processo=%s",
+              bool(texto_ia), processo.id)
 
     if texto_ia:
         adm.texto_resultado = texto_ia

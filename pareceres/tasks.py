@@ -52,12 +52,19 @@ def calcular_admissibilidade_task(self, processo_id):
     """Fase 3: Calcula tempestividade, prescrição e decadência."""
     from pareceres.services.service_admissibilidade import execute
 
+    _log.info("[TASK] calcular_admissibilidade RECEBIDA processo=%s retry=%s",
+              processo_id, self.request.retries)
     try:
         processo = _get_processo(processo_id)
+        _log.info("[TASK] calcular_admissibilidade fase_atual=%s processo=%s",
+                  processo.fase, processo_id)
         result = execute(processo)
+        _log.info("[TASK] calcular_admissibilidade resultado ok=%s processo=%s",
+                  result.ok, processo_id)
         return _handle_result(result, self, processo_id)
     except Exception as exc:
-        _log.error("[TASK] calcular_admissibilidade erro: %s — processo=%s", exc, processo_id)
+        _log.error("[TASK] calcular_admissibilidade erro: %s — processo=%s", exc, processo_id,
+                   exc_info=True)
         raise self.retry(exc=exc, countdown=20 * (self.request.retries + 1))
 
 
