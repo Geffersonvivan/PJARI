@@ -435,8 +435,11 @@
       if (selectedA) admDecisions[cfg.bodyKey] = confirmVal;
       else if (selectedB) admDecisions[cfg.bodyKey] = afastarVal;
 
-      // Detectar se é inversão (julgador diverge do auto)
-      var isInvertido = (jVal !== null && jVal !== undefined && jVal !== autoVal);
+      // Guardar o afastarVal para detecção de inversão dinâmica
+      admDecisions["_afastar_" + cfg.bodyKey] = afastarVal;
+
+      // Detectar se é inversão (Afastar selecionado)
+      var isInvertido = selectedB;
 
       html += '<div class="adm-card open' + (isInvertido ? ' adm-invertido' : '') + '" style="border-left-color:' + cfg.color + ';animation-delay:' + (cardIdx * 80) + 'ms;" data-key="' + cfg.key + '">';
       cardIdx++;
@@ -504,9 +507,10 @@
     var aviso = document.getElementById("aviso-" + cfgKey);
     var pillInv = card.querySelector(".adm-pill-invertido");
     var selected = admDecisions[cfg.bodyKey];
+    var afastarVal = admDecisions["_afastar_" + cfg.bodyKey];
 
-    // "false" = Afastar = inversão
-    var isAfastado = (selected === "false");
+    // Afastado = valor selecionado é igual ao valor de "Afastar"
+    var isAfastado = (selected !== "" && selected !== undefined && selected === afastarVal);
 
     if (aviso) aviso.style.display = isAfastado ? "flex" : "none";
     if (isAfastado) {
