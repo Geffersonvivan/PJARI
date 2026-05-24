@@ -118,7 +118,9 @@ class DocumentAIClient:
                 process_options=documentai.ProcessOptions(
                     ocr_config=documentai.OcrConfig(
                         enable_native_pdf_parsing=True,
-                        language_hints=["pt"],
+                        hints=documentai.OcrConfig.Hints(
+                            language_hints=["pt"],
+                        ),
                     ),
                 ),
             )
