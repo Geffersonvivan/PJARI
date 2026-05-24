@@ -72,18 +72,24 @@ def execute_extracao(processo) -> ServiceResult:
         _log.error("[TESES-EXTRACAO] Erro Gemini: %s — processo=%s", e, processo.id)
         return ServiceResult.falha(f"Erro ao extrair teses: {e}")
 
-    # Tese vazia → INDEFERIDO por ausência de fundamentação (§425-427)
+    # Tese vazia → criar tese padrão e seguir para análise normal
+    # O julgador decide na tela de teses (não pular automaticamente)
     if not tese_extraida:
         _log.warning("[TESES-EXTRACAO] Nenhuma tese identificada — processo=%s", processo.id)
+        processo.teses.all().delete()
         AnaliseTese.objects.create(
             processo=processo,
             ordem=1,
             titulo="Nenhuma tese defensiva identificada na peça recursal.",
         )
+        processo.avancar_fase(FaseProcesso.TESE_AGUARDANDO)
+        log_audit("fase", processo=processo, fase="teses_sem_extracao", dados={
+            "motivo": "Gemini não identificou teses no PDF",
+        })
+        _log.info("[TESES-EXTRACAO] OK (sem teses) processo=%s", processo.id)
         return ServiceResult.sucesso(
-            "Nenhuma tese identificada.",
-            skip_to_parecer=True,
-            motivo="Ausência de fundamentação recursal (§425-427).",
+            "Nenhuma tese identificada. O julgador pode verificar manualmente.",
+            teses_count=0,
         )
 
     # Criar registros de tese

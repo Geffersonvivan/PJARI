@@ -529,13 +529,13 @@
           <p class="text-gray-500 text-sm">Revise as teses extraidas e decida o acolhimento de cada uma.</p>
         </div>
 
-        <!-- Mensagem mérito prejudicado (hidden by default) -->
+        <!-- Mensagem sem teses extraídas (hidden by default) -->
         <div id="teses-prejudicado" class="hidden mb-6">
-          <div class="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 flex items-start gap-3">
-            <i class="ph ph-warning text-amber-600 text-xl mt-0.5"></i>
+          <div class="bg-blue-50 border border-blue-200 rounded-xl px-5 py-4 flex items-start gap-3">
+            <i class="ph ph-info text-blue-600 text-xl mt-0.5"></i>
             <div>
-              <p class="text-sm font-semibold text-amber-800">Merito prejudicado</p>
-              <p class="text-xs text-amber-600">Nao ha teses a analisar. O processo sera encaminhado direto para o parecer.</p>
+              <p class="text-sm font-semibold text-blue-800">Nenhuma tese identificada automaticamente</p>
+              <p class="text-xs text-blue-600">O sistema nao identificou teses defensivas no PDF. Clique em "Confirmar e Gerar Parecer" para prosseguir com a analise sem teses acolhidas (resultado: INDEFERIDO).</p>
             </div>
           </div>
         </div>
@@ -794,7 +794,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/wizard.js' %}?v=20260524a"></script>
+<script src="{% static 'js/wizard.js' %}?v=20260524b"></script>
 <script>
 (function(){
   var _pdfCollapsed = false;
