@@ -394,10 +394,10 @@
         setExtractedDateField("data-np", data.data_np);
         setExtractedDateField("data-instauracao", data.data_instauracao);
 
-        // Data sessão (se já existir)
+        // Data sessão (extraída do PDF ou já existente)
         if (data.data_sessao) {
           var ds = document.querySelector('[name="data_sessao"]');
-          if (ds) ds.value = brDateToIso(data.data_sessao);
+          if (ds && !ds.value) ds.value = brDateToIso(data.data_sessao);
         }
 
         // Confidence badges
@@ -407,6 +407,9 @@
           setConfidenceBadge("data-na", data.confianca.data_na);
           setConfidenceBadge("data-np", data.confianca.data_np);
           setConfidenceBadge("data-instauracao", data.confianca.data_instauracao);
+          if (data.confianca.data_sessao) setConfidenceBadge("data-sessao", data.confianca.data_sessao);
+          if (data.confianca.data_protocolo) setConfidenceBadge("data-protocolo", data.confianca.data_protocolo);
+          if (data.confianca.prazo_final) setConfidenceBadge("prazo-final", data.confianca.prazo_final);
         }
 
         // Provider badge

@@ -41,7 +41,14 @@ PROMPT_EXTRACAO_F2 = (
     "- DATA_NP: aparece na Notificação de Penalidade como 'Data da Notificação de Penalidade', "
     "'Imposição de Penalidade', 'Expedição da NP'. Vem DEPOIS da NA.\n"
     "- DATA_INSTAURACAO: aparece no recurso/requerimento como 'Data de Instauração', "
-    "'Protocolo do Recurso', 'Data de Abertura'. Geralmente é próxima ou igual à DATA_NP.\n\n"
+    "'Protocolo do Recurso', 'Data de Abertura'. Geralmente é próxima ou igual à DATA_NP.\n"
+    "- DATA_SESSAO: aparece na Ata de Julgamento, Pauta da Sessão, ou convocação como "
+    "'Data da Sessão', 'Sessão de Julgamento', 'Pauta dia'. É uma data futura ou recente.\n"
+    "- DATA_PROTOCOLO: aparece no comprovante de protocolo do recurso como "
+    "'Data de Protocolo', 'Protocolado em', 'Recebido em'. É quando o recurso foi registrado.\n"
+    "- PRAZO_PROTOCOLO: aparece na Notificação de Penalidade como "
+    "'Prazo para recurso até', 'Data limite', 'Prazo final'. "
+    "É a data limite para protocolar o recurso JARI.\n\n"
     "EXEMPLO DE RESPOSTA:\n"
     "RECORRENTE: JOSE DA SILVA SANTOS | CONFIANCA: ALTA\n"
     "TIPO_PENALIDADE: multa | CONFIANCA: ALTA\n"
@@ -49,8 +56,11 @@ PROMPT_EXTRACAO_F2 = (
     "DATA_INFRACAO: 15/03/2022 | CONFIANCA: ALTA\n"
     "DATA_NA: 20/04/2022 | CONFIANCA: MEDIA\n"
     "DATA_NP: NAO_ENCONTRADO | CONFIANCA: BAIXA\n"
-    "DATA_INSTAURACAO: 10/06/2022 | CONFIANCA: ALTA\n\n"
-    "CAMPOS PARA EXTRAIR (responda SOMENTE com as 7 linhas, sem nenhum outro texto):\n"
+    "DATA_INSTAURACAO: 10/06/2022 | CONFIANCA: ALTA\n"
+    "DATA_SESSAO: 15/08/2024 | CONFIANCA: MEDIA\n"
+    "DATA_PROTOCOLO: 10/06/2022 | CONFIANCA: ALTA\n"
+    "PRAZO_PROTOCOLO: 25/06/2022 | CONFIANCA: MEDIA\n\n"
+    "CAMPOS PARA EXTRAIR (responda SOMENTE com as 10 linhas, sem nenhum outro texto):\n"
     "RECORRENTE: (nome completo do recorrente/autuado em MAIÚSCULAS) | CONFIANCA: (ALTA/MEDIA/BAIXA)\n"
     "TIPO_PENALIDADE: (multa/advertencia/suspensao/cassacao/nao_determinado) | CONFIANCA: (ALTA/MEDIA/BAIXA)\n"
     "INFRACAO_DOCUMENTO: (descrição curta da infração no AIT) | CONFIANCA: (ALTA/MEDIA/BAIXA)\n"
@@ -58,12 +68,16 @@ PROMPT_EXTRACAO_F2 = (
     "DATA_NA: (data da Notificação de Autuação, DD/MM/AAAA) | CONFIANCA: (ALTA/MEDIA/BAIXA)\n"
     "DATA_NP: (data da Notificação de Penalidade, DD/MM/AAAA) | CONFIANCA: (ALTA/MEDIA/BAIXA)\n"
     "DATA_INSTAURACAO: (data de instauração do processo, DD/MM/AAAA) | CONFIANCA: (ALTA/MEDIA/BAIXA)\n"
+    "DATA_SESSAO: (data da sessão de julgamento JARI, DD/MM/AAAA) | CONFIANCA: (ALTA/MEDIA/BAIXA)\n"
+    "DATA_PROTOCOLO: (data de protocolo do recurso JARI, DD/MM/AAAA) | CONFIANCA: (ALTA/MEDIA/BAIXA)\n"
+    "PRAZO_PROTOCOLO: (prazo/data limite para protocolar o recurso, DD/MM/AAAA) | CONFIANCA: (ALTA/MEDIA/BAIXA)\n"
 )
 
 _NULOS = {"nulo", "null", "none", "n/a", "não encontrado", "nao encontrado",
            "não localizado", "nao localizado", "nao_se_aplica", "nao_encontrado", ""}
 
-_CAMPOS_DATA = ("DATA_INFRACAO", "DATA_NA", "DATA_NP", "DATA_INSTAURACAO")
+_CAMPOS_DATA = ("DATA_INFRACAO", "DATA_NA", "DATA_NP", "DATA_INSTAURACAO",
+                 "DATA_SESSAO", "DATA_PROTOCOLO", "PRAZO_PROTOCOLO")
 _CAMPOS_TEXTO = ("RECORRENTE", "TIPO_PENALIDADE", "INFRACAO_DOCUMENTO")
 
 
@@ -203,8 +217,13 @@ def _validar_datas(resultado: dict) -> dict:
     alertas = []
 
     # Regra 1: Datas dentro de range razoável
+    # DATA_SESSAO pode ser até 1 ano no futuro (pautas agendadas)
+    limite_max_sessao = hoje + datetime.timedelta(days=365)
     for campo, dt in datas.items():
-        if dt and (dt < limite_min or dt > limite_max):
+        if not dt:
+            continue
+        lim = limite_max_sessao if campo == "DATA_SESSAO" else limite_max
+        if dt < limite_min or dt > lim:
             alertas.append(f"{campo} fora do range ({dt})")
             resultado[campo]["confianca"] = "BAIXA"
 
@@ -262,9 +281,25 @@ def _salvar_campos(processo, adm, resultado: dict):
     _log.info("[DOCUMENTOS] Salvando campos processo=%s: %s", processo.id, resultado)
 
     # Salvar no Processo
+    processo_update_fields = []
     if recorrente and recorrente.lower() not in _NULOS:
         processo.recorrente = recorrente[:255].upper()
-        processo.save(update_fields=["recorrente"])
+        processo_update_fields.append("recorrente")
+
+    # Datas do Processo (data_sessao, data_protocolo, prazo_final)
+    for campo, attr in [
+        ("DATA_SESSAO", "data_sessao"),
+        ("DATA_PROTOCOLO", "data_protocolo"),
+        ("PRAZO_PROTOCOLO", "prazo_final"),
+    ]:
+        valor = resultado.get(campo, {}).get("valor", "")
+        parsed = _parse_date_br(valor)
+        if parsed and not getattr(processo, attr):
+            setattr(processo, attr, parsed)
+            processo_update_fields.append(attr)
+
+    if processo_update_fields:
+        processo.save(update_fields=processo_update_fields)
 
     # Salvar na Admissibilidade
     if tipo_penalidade in ("multa", "advertencia", "suspensao", "cassacao"):

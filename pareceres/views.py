@@ -425,6 +425,9 @@ def api_dados_extraidos(request, pk):
             "data_na": confianca.get("data_na", "MEDIA"),
             "data_np": confianca.get("data_np", "MEDIA"),
             "data_instauracao": confianca.get("data_instauracao", "MEDIA"),
+            "data_sessao": confianca.get("data_sessao", ""),
+            "data_protocolo": confianca.get("data_protocolo", ""),
+            "prazo_final": confianca.get("prazo_protocolo", ""),
         },
         "provider": extracao.get("provider", ""),
     })
