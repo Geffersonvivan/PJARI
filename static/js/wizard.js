@@ -412,15 +412,6 @@
           if (data.confianca.prazo_final) setConfidenceBadge("prazo-final", data.confianca.prazo_final);
         }
 
-        // Provider badge
-        if (data.provider) {
-          var provBadge = document.getElementById("provider-badge");
-          var provLabel = document.getElementById("provider-label");
-          if (provBadge && provLabel) {
-            provLabel.textContent = data.provider;
-            provBadge.classList.remove("hidden");
-          }
-        }
 
         initDatePaste();
       })
