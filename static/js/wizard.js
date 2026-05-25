@@ -413,9 +413,7 @@
           setConfidenceBadge("data-na", data.confianca.data_na);
           setConfidenceBadge("data-np", data.confianca.data_np);
           setConfidenceBadge("data-instauracao", data.confianca.data_instauracao);
-          if (data.confianca.data_sessao) setConfidenceBadge("data-sessao", data.confianca.data_sessao);
-          if (data.confianca.data_protocolo) setConfidenceBadge("data-protocolo", data.confianca.data_protocolo);
-          if (data.confianca.prazo_final) setConfidenceBadge("prazo-final", data.confianca.prazo_final);
+
           if (data.confianca.tipo_penalidade) setConfidenceBadge("tipo-penalidade", data.confianca.tipo_penalidade);
         }
 
