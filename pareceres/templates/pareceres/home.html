@@ -205,20 +205,9 @@ document.getElementById("btn-confirmar-excluir").addEventListener("click", funct
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (data.ok) {
-      var row = document.getElementById("proc-row-" + procId);
-      if (row) row.remove();
-      // Atualizar contagem no chip
-      if (btn) {
-        var wrap = btn.closest(".folder-chip-wrap");
-        if (wrap) {
-          var chip = wrap.querySelector(".folder-chip");
-          var countSpan = chip.querySelector("span.text-gray-400");
-          if (countSpan) {
-            var m = countSpan.textContent.match(/\d+/);
-            if (m) countSpan.textContent = "(" + Math.max(0, parseInt(m[0]) - 1) + ")";
-          }
-        }
-      }
+      fecharModalExcluir();
+      location.reload();
+      return;
     } else {
       alert(data.error || "Erro ao excluir.");
     }
