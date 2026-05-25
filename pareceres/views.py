@@ -417,7 +417,7 @@ def api_dados_extraidos(request, pk):
         "data_na": _fmt(adm.data_na) if adm else "",
         "data_np": _fmt(adm.data_np) if adm else "",
         "data_instauracao": _fmt(adm.data_instauracao) if adm else "",
-        "tipo_penalidade": adm.tipo_penalidade if adm else "",
+        "tipo_penalidade": adm.tipo_penalidade if adm else extracao.get("tipo_penalidade", ""),
         "gemini_raw": extracao,
         "confianca": {
             "recorrente": confianca.get("recorrente", "MEDIA"),
@@ -428,6 +428,7 @@ def api_dados_extraidos(request, pk):
             "data_sessao": confianca.get("data_sessao", ""),
             "data_protocolo": confianca.get("data_protocolo", ""),
             "prazo_final": confianca.get("prazo_protocolo", ""),
+            "tipo_penalidade": confianca.get("tipo_penalidade", ""),
         },
         "provider": extracao.get("provider", ""),
     })

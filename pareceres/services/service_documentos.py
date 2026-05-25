@@ -90,8 +90,8 @@ def _extrair_campo(texto_resposta: str, label: str) -> str:
     if not m:
         return ""
     val = m.group(1).strip()
-    # Remover sufixo de confiança
-    val = re.sub(r'\s*\|\s*CONFIAN[CÇ]A\s*:\s*(ALTA|MEDIA|BAIXA)\s*$', '', val, flags=re.IGNORECASE)
+    # Remover sufixo de confiança (qualquer variação: com/sem nível, com/sem cedilha)
+    val = re.sub(r'\s*\|\s*CONFIAN[CÇ]A\s*:?\s*(ALTA|MEDIA|BAIXA)?\s*$', '', val, flags=re.IGNORECASE)
     return val.strip()
 
 

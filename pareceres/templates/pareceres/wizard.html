@@ -321,7 +321,7 @@
             </div>
           </div>
 
-          <!-- Grid 2 colunas: Recorrente + Prazo Protocolo / Data Protocolo + Páginas Defesa -->
+          <!-- Recorrente + Páginas Defesa (campos manuais) -->
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
@@ -334,34 +334,6 @@
             </div>
             <div>
               <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
-                Prazo Protocolo
-                <span id="conf-prazo-final" class="conf-badge hidden"></span>
-              </label>
-              <div class="relative">
-                <input type="date" name="prazo_final" id="field-prazo-final"
-                       onclick="this.showPicker()"
-                       class="w-full border border-gray-200 rounded-lg px-4 py-3 pr-20 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer date-paste">
-                <button type="button" class="btn-colar-data" title="Colar data copiada">
-                  <i class="ph ph-clipboard-text"></i>
-                </button>
-              </div>
-            </div>
-            <div>
-              <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
-                Data Protocolo
-                <span id="conf-data-protocolo" class="conf-badge hidden"></span>
-              </label>
-              <div class="relative">
-                <input type="date" name="data_protocolo" id="field-data-protocolo"
-                       onclick="this.showPicker()"
-                       class="w-full border border-gray-200 rounded-lg px-4 py-3 pr-20 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer date-paste">
-                <button type="button" class="btn-colar-data" title="Colar data copiada">
-                  <i class="ph ph-clipboard-text"></i>
-                </button>
-              </div>
-            </div>
-            <div>
-              <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
                 Paginas Defesa
               </label>
               <input type="text" name="paginas_defesa" id="field-paginas-defesa"
@@ -370,14 +342,49 @@
             </div>
           </div>
 
-          <!-- Datas extraídas do PDF (editáveis pelo MJ) -->
+          <!-- Dados extraídos do PDF (todos editáveis pelo MJ) -->
           <div class="border-t border-gray-100 pt-4 mt-2">
             <div class="flex items-center gap-2 bg-blue-50 border border-blue-300 rounded-lg px-4 py-3 mb-4">
               <i class="ph ph-info text-blue-500 text-lg flex-shrink-0"></i>
-              <span class="text-sm text-blue-700">Confira as informações abaixo extraídas do PDF</span>
+              <span class="text-sm text-blue-700">Confira as informacoes abaixo extraidas do PDF</span>
             </div>
-            <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Datas extraidas do PDF</p>
-            <div class="grid grid-cols-2 gap-4">
+
+            <!-- Datas do recurso -->
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Datas do recurso</p>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+                  Prazo Protocolo
+                  <span id="conf-prazo-final" class="conf-badge hidden"></span>
+                </label>
+                <div class="relative">
+                  <input type="date" name="prazo_final" id="field-prazo-final"
+                         onclick="this.showPicker()"
+                         class="w-full border border-gray-200 rounded-lg px-4 py-3 pr-20 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer date-paste">
+                  <button type="button" class="btn-colar-data" title="Colar data copiada">
+                    <i class="ph ph-clipboard-text"></i>
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+                  Data Protocolo
+                  <span id="conf-data-protocolo" class="conf-badge hidden"></span>
+                </label>
+                <div class="relative">
+                  <input type="date" name="data_protocolo" id="field-data-protocolo"
+                         onclick="this.showPicker()"
+                         class="w-full border border-gray-200 rounded-lg px-4 py-3 pr-20 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer date-paste">
+                  <button type="button" class="btn-colar-data" title="Colar data copiada">
+                    <i class="ph ph-clipboard-text"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Datas da infração -->
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Datas da infracao</p>
+            <div class="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
                   Data da Infracao
@@ -395,7 +402,7 @@
               </div>
               <div>
                 <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
-                  Data da Notif. Autuação
+                  Data da Notif. Autuacao
                   <span id="conf-data-na" class="conf-badge hidden"></span>
                 </label>
                 <div class="relative">
@@ -435,6 +442,23 @@
                   </button>
                 </div>
               </div>
+            </div>
+
+            <!-- Tipo de penalidade -->
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Penalidade</p>
+            <div>
+              <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+                Tipo de Penalidade
+                <span id="conf-tipo-penalidade" class="conf-badge hidden"></span>
+              </label>
+              <select name="tipo_penalidade" id="field-tipo-penalidade"
+                      class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer bg-white">
+                <option value="">Selecione...</option>
+                <option value="multa">Multa</option>
+                <option value="advertencia">Advertencia</option>
+                <option value="suspensao">Suspensao</option>
+                <option value="cassacao">Cassacao</option>
+              </select>
             </div>
           </div>
 
@@ -862,7 +886,7 @@
 </div>
 
 {% block extra_js %}
-<script src="{% static 'js/wizard.js' %}?v=20260524j"></script>
+<script src="{% static 'js/wizard.js' %}?v=20260524k"></script>
 <script>
 (function(){
   var _pdfCollapsed = false;

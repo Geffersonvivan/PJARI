@@ -384,15 +384,21 @@
     api(urls.dadosExtraidos)
       .then((data) => {
         setExtractedField("recorrente", data.recorrente);
-        setExtractedDateField("prazo-final", data.prazo_final);
-        setExtractedDateField("data-protocolo", data.data_protocolo);
         setExtractedField("paginas-defesa", data.paginas_defesa);
 
         // Datas extraídas do PDF
+        setExtractedDateField("prazo-final", data.prazo_final);
+        setExtractedDateField("data-protocolo", data.data_protocolo);
         setExtractedDateField("data-infracao", data.data_infracao);
         setExtractedDateField("data-na", data.data_na);
         setExtractedDateField("data-np", data.data_np);
         setExtractedDateField("data-instauracao", data.data_instauracao);
+
+        // Tipo penalidade
+        if (data.tipo_penalidade) {
+          var sel = document.getElementById("field-tipo-penalidade");
+          if (sel) sel.value = data.tipo_penalidade;
+        }
 
         // Data sessão (extraída do PDF ou já existente)
         if (data.data_sessao) {
@@ -410,6 +416,7 @@
           if (data.confianca.data_sessao) setConfidenceBadge("data-sessao", data.confianca.data_sessao);
           if (data.confianca.data_protocolo) setConfidenceBadge("data-protocolo", data.confianca.data_protocolo);
           if (data.confianca.prazo_final) setConfidenceBadge("prazo-final", data.confianca.prazo_final);
+          if (data.confianca.tipo_penalidade) setConfidenceBadge("tipo-penalidade", data.confianca.tipo_penalidade);
         }
 
 
@@ -479,6 +486,7 @@
         data_na: document.getElementById("field-data-na").value,
         data_np: document.getElementById("field-data-np").value,
         data_instauracao: document.getElementById("field-data-instauracao").value,
+        tipo_penalidade: document.getElementById("field-tipo-penalidade").value,
       };
 
       function enviarConfirmacao(forceFlag) {
@@ -662,9 +670,12 @@
       html += '  </div>';
       html += '  <div class="adm-card-body">';
 
-      // Fundamentação (cálculo do sistema)
+      // Fundamentação (cálculo do sistema) — expandível
       if (fund) {
-        html += '    <div class="adm-fund"><i class="ph ph-calculator"></i> <strong>Calculo:</strong> ' + escapeHtml(fund) + '</div>';
+        html += '    <details class="adm-fund-details">';
+        html += '      <summary class="adm-fund-summary"><i class="ph ph-calculator"></i> <strong>Fundamentacao do calculo</strong> <i class="ph ph-caret-down" style="font-size:12px;margin-left:4px;"></i></summary>';
+        html += '      <div class="adm-fund-content prose-jari text-sm">' + marked.parse(fund) + '</div>';
+        html += '    </details>';
       }
 
       // Auto result badge
