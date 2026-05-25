@@ -386,9 +386,7 @@
         setExtractedField("recorrente", data.recorrente);
         setExtractedField("paginas-defesa", data.paginas_defesa);
 
-        // Datas extraídas do PDF
-        setExtractedDateField("prazo-final", data.prazo_final);
-        setExtractedDateField("data-protocolo", data.data_protocolo);
+        // Datas extraídas do PDF (prazo_final e data_protocolo são manuais)
         setExtractedDateField("data-infracao", data.data_infracao);
         setExtractedDateField("data-na", data.data_na);
         setExtractedDateField("data-np", data.data_np);
