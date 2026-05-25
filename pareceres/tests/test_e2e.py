@@ -128,7 +128,7 @@ def _mock_gemini_client(text_response):
     mock_response.text = text_response
 
     mock_client = MagicMock()
-    mock_client.generate.return_value = (mock_response, "gemini-2.0-flash")
+    mock_client.generate.return_value = (mock_response, "gemini-2.5-flash")
     mock_client.upload_file.return_value = MagicMock()
     mock_client.log_usage.return_value = None
     return mock_client

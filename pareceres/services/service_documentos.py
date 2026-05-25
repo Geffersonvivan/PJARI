@@ -372,7 +372,7 @@ def _tentar_gemini(processo, docs_dict: dict, texto_ocr: str | None = None) -> s
                 PROMPT_EXTRACAO_F2,
             ]
             response, model_used = gemini.generate(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 contents=contents,
                 config={"temperature": 0.1, "max_output_tokens": 1024},
             )
@@ -390,7 +390,7 @@ def _tentar_gemini(processo, docs_dict: dict, texto_ocr: str | None = None) -> s
 
             _log.info("[DOCUMENTOS] Gemini generate processo=%s", processo.id)
             response, model_used = gemini.generate(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 contents=[uploaded, PROMPT_EXTRACAO_F2],
                 config={"temperature": 0.1, "max_output_tokens": 1024},
             )

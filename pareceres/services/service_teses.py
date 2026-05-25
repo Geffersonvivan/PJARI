@@ -104,7 +104,7 @@ def execute_extracao(processo) -> ServiceResult:
         import time as _time
         t0 = _time.time()
         response, model_used = gemini.generate(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             contents=[uploaded, prompt_user],
             config={
                 "temperature": 0.1,
@@ -265,7 +265,7 @@ def execute_analise(processo) -> ServiceResult:
         import time as _time
         t0 = _time.time()
         response, model_used = gemini.generate(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             contents=[{"role": "user", "parts": [{"text": prompt_user}]}],
             config={
                 "temperature": 0.2,
