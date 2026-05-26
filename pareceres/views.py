@@ -848,6 +848,12 @@ def api_auditoria_finalizar(request, pk):
     if processo.fase not in (FaseProcesso.AUDITORIA, FaseProcesso.PARECER, FaseProcesso.PARECER_GERANDO):
         return JsonResponse({"error": "Processo não está na fase de auditoria."}, status=400)
 
+    # ── Gate de créditos ──────────────────────────────────────────────
+    profile = getattr(request.user, "profile", None)
+    if profile and not request.user.is_superuser and not profile.creditos_infinitos:
+        if profile.credits <= 0:
+            return JsonResponse({"error": "Seus créditos acabaram. Entre em contato para adquirir mais."}, status=403)
+
     # ── Gate de validação (parecer completo?) ───────────────────────────
     body = json.loads(request.body) if request.body else {}
     erros = validar_parecer(processo)

@@ -401,8 +401,9 @@ def execute(processo) -> ServiceResult:
     # Avançar para FINALIZADO
     processo.avancar_fase(FaseProcesso.FINALIZADO)
 
-    # Consumir crédito (superuser não consome)
-    if not processo.user.is_superuser:
+    # Consumir crédito (superuser e infinitos não consomem)
+    profile = getattr(processo.user, "profile", None)
+    if profile and not processo.user.is_superuser and not profile.creditos_infinitos:
         from django.db.models import F
         from core.models import UserProfile
         UserProfile.objects.filter(user=processo.user, credits__gt=0).update(

@@ -4,10 +4,10 @@ from .models import UserProfile, TierConfig, Subscription
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "clerk_id", "is_pro", "credits", "tier", "subscription_status")
-    list_filter = ("is_pro", "subscription_status", "tier")
+    list_display = ("user", "clerk_id", "is_pro", "credits", "creditos_infinitos", "tier", "subscription_status")
+    list_filter = ("is_pro", "creditos_infinitos", "subscription_status", "tier")
     search_fields = ("user__username", "user__email", "clerk_id")
-    list_editable = ("is_pro", "credits", "tier")
+    list_editable = ("is_pro", "credits", "creditos_infinitos", "tier")
 
 
 @admin.register(TierConfig)

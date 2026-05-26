@@ -17,7 +17,8 @@ class UserProfile(models.Model):
 
     # Plano e créditos
     is_pro = models.BooleanField(default=False)
-    credits = models.IntegerField(default=5)
+    credits = models.IntegerField(default=5, verbose_name="Créditos")
+    creditos_infinitos = models.BooleanField(default=False, verbose_name="Créditos infinitos")
     subscription_status = models.CharField(max_length=50, default="inactive")
     subscription_start_at = models.DateTimeField(null=True, blank=True)
     subscription_expires_at = models.DateTimeField(null=True, blank=True)
