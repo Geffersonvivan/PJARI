@@ -10,13 +10,72 @@ Responsabilidades:
 
 import concurrent.futures
 import logging
+import os
 import re
+import tempfile
+
+from django.core.files.storage import default_storage
 
 from pareceres.estado import FaseProcesso
 from pareceres.models import AnaliseTese, CacheTese, log_audit
 from . import ServiceResult
 
 _log = logging.getLogger(__name__)
+
+
+def _extrair_paginas_defesa(file_path: str, paginas_str: str) -> str | None:
+    """
+    Recorta apenas as páginas de defesa do PDF e salva num arquivo temporário.
+    Retorna o path do arquivo temporário, ou None se falhar.
+
+    paginas_str: formato "54-56", "3,5,7-9", "todas" ou vazio.
+    """
+    if not paginas_str or paginas_str.strip().lower() == "todas":
+        return None  # Usar PDF completo
+
+    try:
+        import fitz  # PyMuPDF
+
+        # Parsear ranges: "54-56" → [53,54,55], "3,5" → [2,4]
+        paginas = set()
+        for parte in paginas_str.split(","):
+            parte = parte.strip()
+            if "-" in parte:
+                ini, fim = parte.split("-", 1)
+                for p in range(int(ini.strip()), int(fim.strip()) + 1):
+                    paginas.add(p - 1)  # 0-indexed
+            else:
+                paginas.add(int(parte) - 1)
+
+        with default_storage.open(file_path, "rb") as f:
+            pdf_bytes = f.read()
+
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        total = len(doc)
+        paginas_validas = sorted(p for p in paginas if 0 <= p < total)
+
+        if not paginas_validas:
+            doc.close()
+            return None
+
+        novo = fitz.open()
+        for p in paginas_validas:
+            novo.insert_pdf(doc, from_page=p, to_page=p)
+        doc.close()
+
+        tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+        tmp.write(novo.tobytes())
+        tmp.close()
+        novo.close()
+
+        _log.info("[TESES-EXTRACAO] PDF recortado: páginas %s (%d págs) de %d total",
+                  paginas_str, len(paginas_validas), total)
+        return tmp.name
+
+    except Exception as e:
+        _log.warning("[TESES-EXTRACAO] Erro ao recortar páginas '%s': %s — usando PDF completo",
+                     paginas_str, e)
+        return None
 
 # Regex para separar blocos de análise por tese (ex: "**Tese 1 –", "**Tese 2 –")
 _RE_TESE_BLOCK = re.compile(
@@ -89,15 +148,27 @@ def execute_extracao(processo) -> ServiceResult:
     if not doc_consolidado:
         return ServiceResult.falha("Nenhum documento encontrado para extração de teses.")
 
-    # Upload + extração
-    uploaded = gemini.upload_file(doc_consolidado.arquivo.name)
+    # Recortar apenas páginas de defesa (se especificadas)
+    paginas_defesa = processo.paginas_defesa or "todas"
+    pdf_recortado = _extrair_paginas_defesa(doc_consolidado.arquivo.name, paginas_defesa)
+
+    # Upload: PDF recortado (só defesa) ou completo (fallback)
+    if pdf_recortado:
+        uploaded = gemini.upload_file_from_path(pdf_recortado)
+        try:
+            os.unlink(pdf_recortado)
+        except Exception:
+            pass
+    else:
+        uploaded = gemini.upload_file(doc_consolidado.arquivo.name)
+
     if not uploaded:
         return ServiceResult.falha("Não foi possível processar o documento para extração de teses.")
 
-    paginas_defesa = processo.paginas_defesa or "todas"
     prompt_user = (
-        f"Analise a defesa recursal nas páginas {paginas_defesa} do documento. "
-        "Extraia TODAS as teses defensivas apresentadas pelo recorrente."
+        "O documento anexo contém EXCLUSIVAMENTE a defesa recursal do recorrente. "
+        "Extraia TODAS as teses defensivas apresentadas, cada uma separadamente, "
+        "no formato exato: 'Tese N: [resumo]'."
     )
 
     try:
@@ -140,8 +211,15 @@ def execute_extracao(processo) -> ServiceResult:
         )
 
     # Criar registros de tese
-    # Parsear múltiplas teses do texto (formato "Tese 1: ...", "Tese 2: ..." etc.)
-    teses_raw = re.split(r'(?:^|\n)\s*(?:Tese|TESE)\s+\d+\s*[:\-–—]', tese_extraida)
+    # Parsear múltiplas teses — aceita variações de formato:
+    # "Tese 1: ...", "Tese 1 – ...", "1. ...", "1) ...", "- Tese 1: ..."
+    teses_raw = re.split(
+        r'(?:^|\n)\s*(?:'
+        r'(?:[-•]\s*)?(?:Tese|TESE)\s+\d+\s*[:\-–—.]'  # Tese 1: / Tese 1 –
+        r'|\d+\s*[.)]\s*'                                 # 1. / 1)
+        r')',
+        tese_extraida,
+    )
     teses_raw = [t.strip() for t in teses_raw if t.strip()]
 
     if not teses_raw:

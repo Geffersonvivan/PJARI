@@ -128,6 +128,28 @@ class GeminiClient:
             except Exception:
                 pass
 
+    def upload_file_from_path(self, local_path: str):
+        """Upload de PDF local (já no filesystem) para Gemini Files API."""
+        if not self.client or not local_path:
+            return None
+
+        try:
+            uploaded = self.client.files.upload(file=local_path)
+
+            deadline = time.time() + 90
+            while uploaded.state.name != "ACTIVE" and time.time() < deadline:
+                time.sleep(3)
+                uploaded = self.client.files.get(name=uploaded.name)
+
+            if uploaded.state.name != "ACTIVE":
+                _log.error("Gemini file não ficou ACTIVE: %s (state=%s)", local_path, uploaded.state.name)
+                return None
+
+            return uploaded
+        except Exception as e:
+            _log.error("Erro upload Gemini (local): %s — %s", local_path, e)
+            return None
+
     def generate(self, model: str, contents: list, config: dict,
                  fallback_model: str | None = None, max_retries: int = 2,
                  timeout_per_call: int | None = None) -> tuple:
