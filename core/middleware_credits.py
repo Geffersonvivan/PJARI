@@ -30,13 +30,13 @@ class CreditCheckMiddleware:
         if not hasattr(request, "user") or not request.user.is_authenticated:
             return self.get_response(request)
 
-        # Superusers não consomem créditos
-        if request.user.is_superuser:
-            return self.get_response(request)
-
         try:
             profile = request.user.profile
         except Exception:
+            return self.get_response(request)
+
+        # Créditos infinitos — sempre permite
+        if profile.creditos_infinitos:
             return self.get_response(request)
 
         if profile.credits <= 0:
