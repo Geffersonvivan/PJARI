@@ -850,7 +850,8 @@ def api_auditoria_finalizar(request, pk):
 
     # ── Gate de créditos ──────────────────────────────────────────────
     profile = getattr(request.user, "profile", None)
-    if profile and not request.user.is_superuser and not profile.creditos_infinitos:
+    if profile and not profile.creditos_infinitos:
+        profile.refresh_from_db()
         if profile.credits <= 0:
             return JsonResponse({"error": "Seus créditos acabaram. Entre em contato para adquirir mais."}, status=403)
 
