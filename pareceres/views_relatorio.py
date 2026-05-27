@@ -50,11 +50,7 @@ def _montar_item(processo):
 
     teses_resumo = []
     for t in teses:
-        # Pegar apenas as primeiras palavras do título
-        titulo_curto = t.titulo[:80]
-        if len(t.titulo) > 80:
-            titulo_curto += "..."
-        teses_resumo.append(titulo_curto)
+        teses_resumo.append(t.titulo)
 
     if teses_resumo:
         defesa_texto = f"defesa alegou {'; '.join(teses_resumo).lower()}"
