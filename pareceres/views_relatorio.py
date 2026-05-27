@@ -5,11 +5,17 @@ Consolida todos os processos finalizados de uma pasta mensal
 e gera relatório padronizado com 3 linhas por processo.
 """
 
+import logging
+from datetime import date
+
 from django.contrib.auth.decorators import login_required
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import render
+from django.template.loader import render_to_string
 
 from .models import Pasta
+
+_log = logging.getLogger(__name__)
 
 
 def _flag_label(valor, nome_positivo, nome_negativo):
@@ -120,10 +126,9 @@ def _montar_item(processo):
     }
 
 
-@login_required
-def relatorio_mensal(request, pasta_id):
-    """Gera relatório mensal de votos para uma pasta."""
-    pasta = Pasta.objects.filter(pk=pasta_id, user=request.user).first()
+def _contexto_relatorio(user, pasta_id):
+    """Monta contexto compartilhado entre view HTML e PDF."""
+    pasta = Pasta.objects.filter(pk=pasta_id, user=user).first()
     if not pasta:
         raise Http404
 
@@ -137,21 +142,17 @@ def relatorio_mensal(request, pasta_id):
 
     itens = [_montar_item(p) for p in processos]
 
-    # Totais
     total = len(itens)
     deferidos = sum(1 for i in itens if i["resultado"] == "DEFERIDO")
     indeferidos = sum(1 for i in itens if i["resultado"] == "INDEFERIDO")
     nao_conhecidos = sum(1 for i in itens if i["resultado"] == "NAO_CONHECIDO")
 
-    # Nome do mês
-    nome_mes = pasta.nome  # "05 - Maio"
+    nome_mes = pasta.nome
     partes = nome_mes.split(" - ", 1)
     mes_label = partes[1] if len(partes) > 1 else nome_mes
-
-    from datetime import date
     ano = date.today().year
 
-    return render(request, "pareceres/relatorio_mensal.html", {
+    return {
         "pasta": pasta,
         "mes_label": mes_label,
         "ano": ano,
@@ -160,4 +161,31 @@ def relatorio_mensal(request, pasta_id):
         "deferidos": deferidos,
         "indeferidos": indeferidos,
         "nao_conhecidos": nao_conhecidos,
-    })
+    }
+
+
+@login_required
+def relatorio_mensal(request, pasta_id):
+    """Gera relatório mensal de votos (HTML)."""
+    ctx = _contexto_relatorio(request.user, pasta_id)
+    return render(request, "pareceres/relatorio_mensal.html", ctx)
+
+
+@login_required
+def relatorio_mensal_pdf(request, pasta_id):
+    """Gera relatório mensal de votos (PDF via WeasyPrint)."""
+    ctx = _contexto_relatorio(request.user, pasta_id)
+
+    html = render_to_string("pareceres/relatorio_mensal_pdf.html", ctx)
+
+    try:
+        from weasyprint import HTML
+        pdf_bytes = HTML(string=html).write_pdf()
+    except Exception as e:
+        _log.error("[RELATORIO-PDF] Erro WeasyPrint: %s", e, exc_info=True)
+        return HttpResponse("Erro ao gerar PDF.", status=500)
+
+    filename = f"relatorio_{ctx['mes_label'].lower()}_{ctx['ano']}.pdf"
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response

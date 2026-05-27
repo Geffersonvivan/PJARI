@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 2cm; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #1a1a1a; line-height: 1.5; }
+  h1 { font-size: 16px; margin: 0 0 4px 0; }
+  .subtitulo { font-size: 11px; color: #666; margin: 0 0 20px 0; }
+  .deferido { color: #15803d; }
+  .indeferido { color: #b91c1c; }
+  .item { border-bottom: 1px solid #e5e5e5; padding: 10px 0; }
+  .item:last-child { border-bottom: none; }
+  .linha1 { font-size: 12px; font-weight: bold; margin: 0 0 2px 0; }
+  .linha2 { font-size: 10px; color: #555; margin: 0 0 2px 0; }
+  .linha3 { font-size: 10px; color: #888; margin: 0; }
+  .badge { font-size: 9px; font-weight: bold; padding: 1px 6px; border-radius: 8px; float: right; }
+  .badge-def { background: #dcfce7; color: #15803d; }
+  .badge-ind { background: #fee2e2; color: #b91c1c; }
+  .badge-nc { background: #f3f4f6; color: #4b5563; }
+  .rodape { margin-top: 30px; font-size: 9px; color: #aaa; text-align: center; border-top: 1px solid #e5e5e5; padding-top: 10px; }
+</style>
+</head>
+<body>
+
+<h1>Relatório mês {{ mes_label|lower }}/{{ ano }}</h1>
+<p class="subtitulo">
+  {{ total }} processo{{ total|pluralize:"s" }}
+  {% if total > 0 %}
+  &mdash;
+  <span class="deferido">{{ deferidos }} deferido{{ deferidos|pluralize:"s" }}</span>
+  &middot;
+  <span class="indeferido">{{ indeferidos }} indeferido{{ indeferidos|pluralize:"s" }}</span>
+  {% if nao_conhecidos %}
+  &middot; {{ nao_conhecidos }} não conhecido{{ nao_conhecidos|pluralize:"s" }}
+  {% endif %}
+  {% endif %}
+</p>
+
+{% for item in itens %}
+<div class="item">
+  <p class="linha1">
+    {{ item.linha1 }}
+    {% if item.resultado == "DEFERIDO" %}
+    <span class="badge badge-def">DEFERIDO</span>
+    {% elif item.resultado == "INDEFERIDO" %}
+    <span class="badge badge-ind">INDEFERIDO</span>
+    {% elif item.resultado == "NAO_CONHECIDO" %}
+    <span class="badge badge-nc">NÃO CONHECIDO</span>
+    {% endif %}
+  </p>
+  <p class="linha2">{{ item.linha2 }}</p>
+  <p class="linha3">{{ item.linha3 }}</p>
+</div>
+{% empty %}
+<p style="color:#999;text-align:center;padding:40px 0;">Nenhum processo finalizado neste mês.</p>
+{% endfor %}
+
+<div class="rodape">
+  P-JARI/SC &mdash; Gerado automaticamente
+</div>
+
+</body>
+</html>

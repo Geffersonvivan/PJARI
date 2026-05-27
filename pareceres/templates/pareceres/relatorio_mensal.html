@@ -26,6 +26,12 @@
         </p>
       </div>
       <div class="flex items-center gap-2">
+        <a href="{% url 'pareceres:relatorio_mensal_pdf' pasta_id=pasta.id %}"
+           class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-blue-600 rounded-lg hover:bg-blue-700 transition"
+           style="text-decoration:none;">
+          <i class="ph ph-file-pdf" style="font-size:16px;"></i>
+          Baixar PDF
+        </a>
         <button onclick="window.print()" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition">
           <i class="ph ph-printer" style="font-size:16px;"></i>
           Imprimir
