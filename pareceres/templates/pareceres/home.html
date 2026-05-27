@@ -41,6 +41,16 @@
         {% empty %}
         <p class="px-3 py-2 text-xs text-gray-400 text-center">Nenhum parecer neste mês</p>
         {% endfor %}
+        {% if pasta.processos.count > 0 %}
+        <div class="border-t border-gray-100 mt-1 px-3 py-2">
+          <a href="{% url 'pareceres:relatorio_mensal' pasta_id=pasta.id %}"
+             class="flex items-center gap-2 text-xs font-medium text-blue-600 hover:text-blue-800 transition"
+             style="text-decoration:none;">
+            <i class="ph ph-file-text" style="font-size:14px;"></i>
+            Gerar Relatório
+          </a>
+        </div>
+        {% endif %}
       </div>
     </div>
     {% endfor %}

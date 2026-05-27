@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from .views_pdf import exportar_parecer_pdf
+from .views_relatorio import relatorio_mensal
 from .views_stats import estatisticas_view, estatisticas_gerais_view
 
 app_name = "pareceres"
@@ -83,6 +84,9 @@ urlpatterns = [
 
     # PDF proxy (iframe viewer)
     path("processo/<int:pk>/pdf/<str:tipo>/", views.pdf_proxy, name="pdf_proxy"),
+
+    # Relatório Mensal
+    path("relatorio/<int:pasta_id>/", relatorio_mensal, name="relatorio_mensal"),
 
     # Estatísticas
     path("estatisticas/", estatisticas_view, name="estatisticas"),

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}P-JARI — Relatório {{ mes_label }}/{{ ano }}{% endblock %}
+
+{% block content %}
+<div class="w-full py-8 flex-1" style="padding-left:50px;padding-right:50px;">
+
+  <!-- Cabeçalho -->
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-bold text-gray-800">
+          Relatório mês {{ mes_label|lower }}/{{ ano }}
+        </h1>
+        <p class="text-sm text-gray-500 mt-1">
+          {{ total }} processo{{ total|pluralize:"s" }}
+          {% if total > 0 %}
+          —
+          <span class="text-green-600 font-semibold">{{ deferidos }} deferido{{ deferidos|pluralize:"s" }}</span>
+          &middot;
+          <span class="text-red-600 font-semibold">{{ indeferidos }} indeferido{{ indeferidos|pluralize:"s" }}</span>
+          {% if nao_conhecidos %}
+          &middot;
+          <span class="text-gray-600 font-semibold">{{ nao_conhecidos }} não conhecido{{ nao_conhecidos|pluralize:"s" }}</span>
+          {% endif %}
+          {% endif %}
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="window.print()" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition">
+          <i class="ph ph-printer" style="font-size:16px;"></i>
+          Imprimir
+        </button>
+        <a href="{% url 'pareceres:home' %}" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition" style="text-decoration:none;">
+          <i class="ph ph-arrow-left" style="font-size:16px;"></i>
+          Voltar
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {% if not itens %}
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
+    <i class="ph ph-clipboard-text text-gray-300" style="font-size:48px;"></i>
+    <p class="text-gray-400 mt-4">Nenhum processo finalizado neste mês.</p>
+  </div>
+  {% endif %}
+
+  <!-- Itens do relatório -->
+  <div class="space-y-3">
+    {% for item in itens %}
+    <div class="bg-white rounded-xl border border-gray-100 shadow-sm px-6 py-4 hover:border-gray-200 transition">
+      <!-- Linha 1: Identificação -->
+      <div class="flex items-center justify-between mb-1">
+        <p class="text-sm font-bold text-gray-800">{{ item.linha1 }}</p>
+        {% if item.resultado == "DEFERIDO" %}
+        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">DEFERIDO</span>
+        {% elif item.resultado == "INDEFERIDO" %}
+        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">INDEFERIDO</span>
+        {% elif item.resultado == "NAO_CONHECIDO" %}
+        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">NÃO CONHECIDO</span>
+        {% endif %}
+      </div>
+      <!-- Linha 2: Síntese -->
+      <p class="text-xs text-gray-500 leading-relaxed mb-1">{{ item.linha2 }}</p>
+      <!-- Linha 3: Bloco técnico -->
+      <p class="text-xs text-gray-400 leading-relaxed">{{ item.linha3 }}</p>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+
+<style>
+  @media print {
+    nav, #folders-bar, button, a[href*="home"] { display: none !important; }
+    .shadow-sm { box-shadow: none !important; }
+    body { background: white !important; }
+  }
+</style>
+{% endblock %}
