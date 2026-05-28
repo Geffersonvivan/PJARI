@@ -323,6 +323,24 @@ def _salvar_campos(processo, adm, resultado: dict):
     adm.save()
 
 
+# ── OCR → Markdown ───────────────────────────────────────────────────────────
+
+
+def _ocr_para_markdown(ocr_resultado: dict) -> str:
+    """
+    Converte resultado do Document AI OCR em Markdown estruturado.
+    Cada página vira uma seção com heading, facilitando a leitura pela LLM.
+    """
+    partes = []
+    for pagina in ocr_resultado.get("paginas", []):
+        num = pagina.get("numero", "?")
+        texto = pagina.get("texto", "").strip()
+        if texto:
+            partes.append(f"## Página {num}\n\n{texto}")
+
+    return "\n\n---\n\n".join(partes)
+
+
 # ── Providers ────────────────────────────────────────────────────────────────
 
 
@@ -365,10 +383,10 @@ def _tentar_gemini(processo, docs_dict: dict, texto_ocr: str | None = None) -> s
         start = time.time()
 
         if texto_ocr:
-            # Usar texto OCR do Document AI (mais preciso, sem custo de upload)
-            _log.info("[DOCUMENTOS] Gemini com texto OCR processo=%s", processo.id)
+            # Usar Markdown estruturado do Document AI (mais preciso, sem upload)
+            _log.info("[DOCUMENTOS] Gemini com MD processo=%s", processo.id)
             contents = [
-                f"TEXTO EXTRAÍDO DO PDF VIA OCR:\n\n{texto_ocr[:50000]}",
+                f"# DOCUMENTO DO PROCESSO (OCR Markdown)\n\n{texto_ocr[:50000]}",
                 PROMPT_EXTRACAO_F2,
             ]
             response, model_used = gemini.generate(
@@ -448,12 +466,17 @@ def execute(processo) -> ServiceResult:
 
     docs_dict = {tipo: d.arquivo.name for tipo, d in docs.items() if d.arquivo}
 
-    # ── Camada 0: OCR via Document AI (quando disponível) ──────────────
+    # ── Camada 0: OCR via Document AI → Markdown ───────────────────────
     ocr_resultado = _tentar_document_ai(docs_dict)
-    texto_ocr = ocr_resultado["texto_completo"] if ocr_resultado else None
-    if texto_ocr:
-        _log.info("[DOCUMENTOS] OCR Document AI disponível (%d chars, confiança=%.1f%%)",
-                  len(texto_ocr), ocr_resultado["confianca_media"] * 100)
+    texto_ocr = None
+    if ocr_resultado and ocr_resultado.get("paginas"):
+        texto_ocr = _ocr_para_markdown(ocr_resultado)
+        _log.info("[DOCUMENTOS] OCR→MD: %d páginas, %d chars, confiança=%.1f%%",
+                  ocr_resultado["total_paginas"], len(texto_ocr),
+                  ocr_resultado["confianca_media"] * 100)
+    elif ocr_resultado and ocr_resultado.get("texto_completo"):
+        texto_ocr = ocr_resultado["texto_completo"]
+        _log.info("[DOCUMENTOS] OCR texto bruto (sem páginas): %d chars", len(texto_ocr))
 
     # ── Camada 1: Extração Gemini ───────────────────────────────────────
     texto_gemini = _tentar_gemini(processo, docs_dict, texto_ocr=texto_ocr)
@@ -504,6 +527,8 @@ def execute(processo) -> ServiceResult:
         extracao_json["ocr_confianca"] = ocr_resultado["confianca_media"]
         extracao_json["ocr_paginas"] = ocr_resultado["total_paginas"]
         extracao_json["ocr_latency_ms"] = ocr_resultado["latency_ms"]
+    if texto_ocr:
+        extracao_json["ocr_markdown"] = texto_ocr
     if texto_gemini:
         extracao_json["raw_gemini"] = texto_gemini[:2000]
     if texto_claude:
