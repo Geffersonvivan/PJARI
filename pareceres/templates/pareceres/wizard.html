@@ -315,7 +315,7 @@
                    class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
           </div>
 
-          <!-- Data da Sessão + Páginas Defesa -->
+          <!-- Campos manuais: Data Sessão, Prazo Protocolo, Data Protocolo, Páginas Defesa -->
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
@@ -333,18 +333,6 @@
             </div>
             <div>
               <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
-                Paginas Defesa
-              </label>
-              <input type="text" name="paginas_defesa" id="field-paginas-defesa"
-                     placeholder="Ex: 54-56"
-                     class="manual-field w-full border border-amber-300 bg-amber-50 rounded-lg px-4 py-3 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
-            </div>
-          </div>
-
-          <!-- Prazo Protocolo + Data Protocolo (preenchimento manual) -->
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
                 Prazo Protocolo
               </label>
               <div class="relative">
@@ -356,6 +344,8 @@
                 </button>
               </div>
             </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
                 Data Protocolo
@@ -368,6 +358,14 @@
                   <i class="ph ph-clipboard-text"></i>
                 </button>
               </div>
+            </div>
+            <div>
+              <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+                Paginas Defesa
+              </label>
+              <input type="text" name="paginas_defesa" id="field-paginas-defesa"
+                     placeholder="Ex: 54-56"
+                     class="manual-field w-full border border-amber-300 bg-amber-50 rounded-lg px-4 py-3 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
             </div>
           </div>
 
