@@ -436,21 +436,42 @@
     if (!badge) return;
     var n = (nivel || "MEDIA").toUpperCase();
     badge.className = "conf-badge";
+    var tip = "";
     if (n === "ALTA") {
       badge.classList.add("conf-alta");
       badge.textContent = "alta";
-      badge.title = "Campo extraído com alta certeza — texto claro e inequívoco no documento";
+      tip = "Extraído com alta certeza";
     } else if (n === "MEDIA") {
       badge.classList.add("conf-media");
       badge.textContent = "media";
-      badge.title = "Campo inferido pelo contexto ou com leitura parcialmente legível — confira o valor";
+      tip = "Inferido pelo contexto — confira o valor";
     } else {
       badge.classList.add("conf-baixa");
       badge.textContent = "baixa";
-      badge.title = "Campo ambíguo ou não encontrado com clareza — preencha manualmente";
+      tip = "Ambíguo — preencha manualmente";
     }
+    // Tooltip via click
+    var span = document.createElement("span");
+    span.className = "conf-tooltip";
+    span.textContent = tip;
+    badge.appendChild(span);
+    badge.addEventListener("click", function(e) {
+      e.stopPropagation();
+      // Fechar outros
+      document.querySelectorAll(".conf-badge.show-tip").forEach(function(b) {
+        if (b !== badge) b.classList.remove("show-tip");
+      });
+      badge.classList.toggle("show-tip");
+    });
     badge.classList.remove("hidden");
   }
+
+  // Fechar tooltips ao clicar fora
+  document.addEventListener("click", function() {
+    document.querySelectorAll(".conf-badge.show-tip").forEach(function(b) {
+      b.classList.remove("show-tip");
+    });
+  });
 
   // Campos manuais: remover destaque âmbar ao preencher
   document.querySelectorAll(".manual-field").forEach(function(input) {
