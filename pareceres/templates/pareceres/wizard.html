@@ -304,32 +304,32 @@
         <!-- Form -->
         <form id="form-dados-extraidos" class="space-y-4">
 
-          <!-- Data da Sessão (linha inteira, obrigatório) -->
+          <!-- Recorrente (preenchido pela extração) -->
           <div>
             <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
-              Data da Sessao
-              <span class="text-orange-400 text-[10px] font-normal">— obrigatorio</span>
+              Recorrente
+              <span id="conf-recorrente" class="conf-badge hidden"></span>
             </label>
-            <div class="relative">
-              <input type="date" name="data_sessao" required
-                     onclick="this.showPicker()"
-                     class="w-full border border-gray-200 rounded-lg px-4 py-3 pr-20 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer date-paste">
-              <button type="button" class="btn-colar-data" title="Colar data copiada">
-                <i class="ph ph-clipboard-text"></i>
-              </button>
-            </div>
+            <input type="text" name="recorrente" id="field-recorrente"
+                   placeholder="Nome do recorrente"
+                   class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
           </div>
 
-          <!-- Recorrente + Páginas Defesa -->
+          <!-- Data da Sessão + Páginas Defesa -->
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
-                Recorrente
-                <span id="conf-recorrente" class="conf-badge hidden"></span>
+                Data da Sessao
+                <span class="text-orange-400 text-[10px] font-normal">— obrigatorio</span>
               </label>
-              <input type="text" name="recorrente" id="field-recorrente"
-                     placeholder="Nome do recorrente"
-                     class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+              <div class="relative">
+                <input type="date" name="data_sessao" required
+                       onclick="this.showPicker()"
+                       class="w-full border border-gray-200 rounded-lg px-4 py-3 pr-20 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer date-paste">
+                <button type="button" class="btn-colar-data" title="Colar data copiada">
+                  <i class="ph ph-clipboard-text"></i>
+                </button>
+              </div>
             </div>
             <div>
               <label class="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
