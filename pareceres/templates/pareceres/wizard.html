@@ -325,7 +325,7 @@
               <div class="relative">
                 <input type="date" name="data_sessao" required
                        onclick="this.showPicker()"
-                       class="w-full border border-gray-200 rounded-lg px-4 py-3 pr-20 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer date-paste">
+                       class="manual-field w-full border border-amber-300 bg-amber-50 rounded-lg px-4 py-3 pr-20 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer date-paste">
                 <button type="button" class="btn-colar-data" title="Colar data copiada">
                   <i class="ph ph-clipboard-text"></i>
                 </button>
@@ -337,7 +337,7 @@
               </label>
               <input type="text" name="paginas_defesa" id="field-paginas-defesa"
                      placeholder="Ex: 54-56"
-                     class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                     class="manual-field w-full border border-amber-300 bg-amber-50 rounded-lg px-4 py-3 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
             </div>
           </div>
 
@@ -350,7 +350,7 @@
               <div class="relative">
                 <input type="date" name="prazo_final" id="field-prazo-final"
                        onclick="this.showPicker()"
-                       class="w-full border border-gray-200 rounded-lg px-4 py-3 pr-20 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer date-paste">
+                       class="manual-field w-full border border-amber-300 bg-amber-50 rounded-lg px-4 py-3 pr-20 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer date-paste">
                 <button type="button" class="btn-colar-data" title="Colar data copiada">
                   <i class="ph ph-clipboard-text"></i>
                 </button>
@@ -363,7 +363,7 @@
               <div class="relative">
                 <input type="date" name="data_protocolo" id="field-data-protocolo"
                        onclick="this.showPicker()"
-                       class="w-full border border-gray-200 rounded-lg px-4 py-3 pr-20 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer date-paste">
+                       class="manual-field w-full border border-amber-300 bg-amber-50 rounded-lg px-4 py-3 pr-20 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer date-paste">
                 <button type="button" class="btn-colar-data" title="Colar data copiada">
                   <i class="ph ph-clipboard-text"></i>
                 </button>
@@ -809,6 +809,7 @@
     font-size: 9px; font-weight: 600; padding: 1px 6px;
     border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.03em;
     margin-left: 4px; vertical-align: middle;
+    cursor: help;
   }
   .conf-badge::before {
     content: ''; display: inline-block;

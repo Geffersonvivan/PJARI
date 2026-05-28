@@ -439,15 +439,35 @@
     if (n === "ALTA") {
       badge.classList.add("conf-alta");
       badge.textContent = "alta";
+      badge.title = "Campo extraído com alta certeza — texto claro e inequívoco no documento";
     } else if (n === "MEDIA") {
       badge.classList.add("conf-media");
       badge.textContent = "media";
+      badge.title = "Campo inferido pelo contexto ou com leitura parcialmente legível — confira o valor";
     } else {
       badge.classList.add("conf-baixa");
       badge.textContent = "baixa";
+      badge.title = "Campo ambíguo ou não encontrado com clareza — preencha manualmente";
     }
     badge.classList.remove("hidden");
   }
+
+  // Campos manuais: remover destaque âmbar ao preencher
+  document.querySelectorAll(".manual-field").forEach(function(input) {
+    function checkAmbar() {
+      if (input.value) {
+        input.classList.remove("border-amber-300", "bg-amber-50");
+        input.classList.add("border-gray-200", "bg-white");
+      } else {
+        input.classList.remove("border-gray-200", "bg-white");
+        input.classList.add("border-amber-300", "bg-amber-50");
+      }
+    }
+    input.addEventListener("input", checkAmbar);
+    input.addEventListener("change", checkAmbar);
+    // Checar estado inicial (pode já vir preenchido)
+    setTimeout(checkAmbar, 500);
+  });
 
   var formDados = document.getElementById("form-dados-extraidos");
   if (formDados) {
