@@ -556,6 +556,21 @@ def api_admissibilidade_confirmar(request, pk):
     processo = get_object_or_404(Processo, pk=pk, user=request.user)
 
     if processo.fase != FaseProcesso.ADMISSIBILIDADE_AGUARDANDO:
+        # Fase já avançou (confirmação anterior processou mas resposta não chegou ao frontend)
+        fases_adiante = (
+            FaseProcesso.TESE, FaseProcesso.TESE_AGUARDANDO,
+            FaseProcesso.PARECER, FaseProcesso.PARECER_GERANDO,
+            FaseProcesso.AUDITORIA, FaseProcesso.FINALIZADO,
+        )
+        if processo.fase in fases_adiante:
+            skip_teses = processo.fase in (
+                FaseProcesso.PARECER, FaseProcesso.PARECER_GERANDO,
+                FaseProcesso.AUDITORIA, FaseProcesso.FINALIZADO,
+            )
+            return JsonResponse({
+                "ok": True, "rota": "já_processado", "task_id": "sync",
+                "skip_teses": skip_teses,
+            })
         return JsonResponse({"error": "Processo não está aguardando confirmação de admissibilidade."}, status=400)
 
     body = json.loads(request.body) if request.body else {}
