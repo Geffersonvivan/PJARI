@@ -58,6 +58,9 @@ htmlcov/
 # Projeto antigo (referência, não subir)
 P-Jari_antigo/
 
+# Documentos internos
+GOOGLE_BILLING_DISPUTE.md
+
 # Arquivos de teste/referência
 Consolidado_teste/
 Template_referencia*/
