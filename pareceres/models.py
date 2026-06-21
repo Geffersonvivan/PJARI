@@ -1,7 +1,11 @@
 from django.db import models
 from django.contrib.auth.models import User
+from pgvector.django import VectorField, HnswIndex
 
 from .estado import FaseProcesso
+
+# Dimensão dos embeddings (paraphrase-multilingual-MiniLM-L12-v2 → 384)
+EMBEDDING_DIM = 384
 
 
 # ─── Pasta (organização do usuário) ──────────────────────────────────────────
@@ -494,9 +498,9 @@ class DocumentoNormativo(models.Model):
     nome_arquivo = models.CharField(max_length=500, db_index=True)
     pagina_inicio = models.IntegerField(default=1)
     texto = models.TextField()
-    embedding = models.JSONField(
-        null=True, blank=True,
-        help_text="Vetor de embedding (float list) — gerado por sentence-transformers.",
+    embedding = VectorField(
+        dimensions=EMBEDDING_DIM, null=True, blank=True,
+        help_text="Vetor de embedding (pgvector) — gerado por sentence-transformers.",
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -506,6 +510,13 @@ class DocumentoNormativo(models.Model):
         verbose_name_plural = "Documentos Normativos"
         indexes = [
             models.Index(fields=["nome_arquivo", "pagina_inicio"]),
+            HnswIndex(
+                name="docnorm_emb_hnsw",
+                fields=["embedding"],
+                m=16,
+                ef_construction=64,
+                opclasses=["vector_cosine_ops"],
+            ),
         ]
 
     def __str__(self):

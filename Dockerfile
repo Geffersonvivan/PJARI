@@ -27,6 +27,12 @@ COPY requirements.txt /app/
 RUN pip install --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
+# Modelo de embedding do RAG baixado no build (evita cold-download em produção).
+# Cache fora de /app/media (volume) e fora de /app (COPY) para não ser sobrescrito.
+ENV HF_HOME=/opt/hf_cache
+ENV SENTENCE_TRANSFORMERS_HOME=/opt/hf_cache
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')"
+
 # Copia código
 COPY . /app/
 

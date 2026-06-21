@@ -71,52 +71,88 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"Ingestao completa: {total} fragmentos criados."))
 
     def _load_embed_model(self):
-        """Carrega sentence-transformers para gerar embeddings."""
+        """
+        Retorna função de embedding usando o MESMO modelo da busca
+        (pareceres.integrations.vertex.embed_texts), garantindo que
+        ingestão e query produzam vetores compatíveis.
+        """
         try:
-            from sentence_transformers import SentenceTransformer
-            model = SentenceTransformer("all-MiniLM-L6-v2")
-            self.stdout.write("Modelo de embeddings carregado: all-MiniLM-L6-v2")
-
-            def embed(text):
-                vec = model.encode(text, show_progress_bar=False)
-                return vec.tolist()
-
-            return embed
-        except ImportError:
+            from pareceres.integrations.vertex import _MODEL_NAME, embed_texts
+            # Força o carregamento do modelo já aqui (falha cedo se faltar dep)
+            embed_texts(["_warmup_"])
+            self.stdout.write(f"Modelo de embeddings carregado: {_MODEL_NAME}")
+            return lambda text: embed_texts([text])[0]
+        except (ImportError, RuntimeError) as e:
             self.stderr.write(
-                "sentence-transformers nao instalado. "
-                "Embeddings serao gerados posteriormente."
+                f"sentence-transformers indisponivel ({e}). "
+                "Embeddings nao serao gerados."
             )
             return None
 
+    # Abaixo deste total de caracteres consideramos o PDF "escaneado" → OCR
+    MIN_CHARS_TEXTO = 100
+
     def _extract_chunks(self, pdf_path, chunk_size, overlap):
-        """Extrai texto do PDF e divide em chunks."""
+        """Extrai texto do PDF (nativo, com fallback OCR) e divide em chunks."""
         try:
             import fitz  # PyMuPDF
         except ImportError:
             self.stderr.write("PyMuPDF nao instalado. Instale com: pip install PyMuPDF")
             return []
 
-        chunks = []
+        # 1. Extração nativa (camada de texto do PDF)
         doc = fitz.open(pdf_path)
-
+        paginas = []
+        total_chars = 0
         for page_num in range(len(doc)):
-            page = doc[page_num]
-            text = page.get_text("text").strip()
+            text = doc[page_num].get_text("text").strip()
+            paginas.append((page_num + 1, text))
+            total_chars += len(text)
+        doc.close()
+
+        # 2. PDF sem texto extraível (escaneado) → OCR via Document AI
+        if total_chars < self.MIN_CHARS_TEXTO:
+            self.stdout.write(self.style.WARNING(
+                f"    sem texto nativo ({total_chars} chars) — tentando OCR via Document AI..."
+            ))
+            ocr_paginas = self._ocr_paginas(pdf_path)
+            if ocr_paginas:
+                paginas = ocr_paginas
+                ocr_chars = sum(len(t) for _, t in ocr_paginas)
+                self.stdout.write(self.style.SUCCESS(
+                    f"    OCR ok: {ocr_chars} chars extraidos"
+                ))
+            else:
+                self.stderr.write("    OCR indisponivel/falhou — PDF ignorado.")
+                return []
+
+        # 3. Chunking com overlap
+        chunks = []
+        for page_num, text in paginas:
             if not text:
                 continue
-
             words = text.split()
             if len(words) <= chunk_size:
-                chunks.append((page_num + 1, text))
+                chunks.append((page_num, text))
             else:
-                # Dividir em chunks com overlap
                 i = 0
                 while i < len(words):
                     chunk_words = words[i:i + chunk_size]
-                    chunk_text = " ".join(chunk_words)
-                    chunks.append((page_num + 1, chunk_text))
+                    chunks.append((page_num, " ".join(chunk_words)))
                     i += chunk_size - overlap
 
-        doc.close()
         return chunks
+
+    def _ocr_paginas(self, pdf_path):
+        """Roda Document AI OCR num PDF escaneado. Retorna [(num, texto), ...] ou None."""
+        try:
+            from pareceres.integrations.document_ai import DocumentAIClient
+        except ImportError:
+            return None
+        client = DocumentAIClient()
+        if not client.disponivel:
+            return None
+        resultado = client.ocr_pdf_path(pdf_path)
+        if not resultado or not resultado.get("paginas"):
+            return None
+        return [(p["numero"], p["texto"]) for p in resultado["paginas"]]

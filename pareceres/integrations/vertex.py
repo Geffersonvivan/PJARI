@@ -21,7 +21,7 @@ _RAG_CACHE_TTL = 86_400  # 24h
 # Singleton do modelo de embedding
 _embed_model = None
 _embed_lock = threading.Lock()
-_MODEL_NAME = os.environ.get("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+_MODEL_NAME = os.environ.get("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
 
 
 def _rag_cache_key(prefix: str, query: str) -> str:
@@ -93,9 +93,15 @@ class VertexRAGClient:
         Busca no RAG do Inventário Normativo.
         Retorna texto formatado com os resultados ou fallback em caso de erro.
         """
+        from django.conf import settings
+
+        # Backend local (pgvector) é o padrão — Vertex é legado opcional.
+        if getattr(settings, "RAG_BACKEND", "local") == "local":
+            return self._search_local(query, top_k, processo=processo)
+
         if not self.project_id or not self.datastore_id:
             _log.warning("Vertex RAG não configurado (PROJECT_ID ou DATASTORE_ID vazios)")
-            return self._search_local(query, top_k)
+            return self._search_local(query, top_k, processo=processo)
 
         # Cache Redis
         cache_key = _rag_cache_key("vertex", query)
@@ -163,13 +169,75 @@ class VertexRAGClient:
             _log.error("Erro Vertex RAG: %s — fallback para busca local", e)
             return self._search_local(query, top_k)
 
-    def _search_local(self, query: str, top_k: int = 5) -> str:
-        """Fallback: busca vetorial local nos DocumentoNormativo do banco."""
+    def _search_local(self, query: str, top_k: int = 5, processo=None) -> str:
+        """
+        Busca vetorial local no Inventário Normativo via pgvector.
+
+        O ranking por similaridade de cosseno roda dentro do Postgres
+        (operador `<=>` + índice HNSW). Retorna os top_k trechos formatados.
+        """
+        import time
+
+        from pgvector.django import CosineDistance
+
+        from pareceres.models import DocumentoNormativo
+
+        # Cache Redis
+        cache_key = _rag_cache_key("local", query)
+        r = _get_redis()
+        if r:
+            try:
+                cached = r.get(cache_key)
+                if cached:
+                    return cached
+            except Exception:
+                pass
+
         try:
-            from pareceres.models import CacheTese
-            # Se não tiver embeddings locais, retornar vazio
-            _log.info("Vertex RAG local: busca por '%s'", query[:80])
-            return f"[RAG local] Busca por: {query[:100]}... (embedding local não implementado nesta versão)"
+            start_time = time.time()
+            q_emb = embed_texts([query])[0]
+
+            rows = list(
+                DocumentoNormativo.objects
+                .exclude(embedding__isnull=True)
+                .annotate(dist=CosineDistance("embedding", q_emb))
+                .order_by("dist")
+                .values("nome_arquivo", "pagina_inicio", "texto", "dist")[:top_k]
+            )
+
+            if not rows:
+                return "Nenhum normativo indexado na base local."
+
+            partes = []
+            for d in rows:
+                similaridade = 1.0 - float(d["dist"])
+                partes.append(
+                    f"**{d['nome_arquivo']} (p.{d['pagina_inicio']}, "
+                    f"relevância {similaridade:.0%})**\n{d['texto']}"
+                )
+            texto = "\n\n---\n\n".join(partes)
+
+            latency_ms = int((time.time() - start_time) * 1000)
+            try:
+                from pareceres.models import log_audit
+                log_audit(
+                    "ia_request",
+                    processo=processo,
+                    fase="RAG Local",
+                    provider="RAG-pgvector",
+                    latency_ms=latency_ms,
+                    dados={"query": query[:200], "results_count": len(rows)},
+                )
+            except Exception:
+                pass
+
+            if r:
+                try:
+                    r.setex(cache_key, _RAG_CACHE_TTL, texto)
+                except Exception:
+                    pass
+
+            return texto
         except Exception as e:
-            _log.error("Erro busca local: %s", e)
+            _log.error("Erro busca local pgvector: %s", e, exc_info=True)
             return "Erro na busca de fundamentação normativa."
