@@ -17,6 +17,21 @@ from . import ServiceResult
 
 _log = logging.getLogger(__name__)
 
+
+def _run_in_thread(fn, *args):
+    """Executa `fn` numa thread worker e fecha as conexões de BD que ela abriu.
+
+    As conexões do Django são thread-local: cada thread do executor abre as suas
+    próprias e precisa fechá-las ao terminar, senão vazam. Fechar a partir da
+    thread principal (com close_old_connections) seria errado — derrubaria a
+    conexão da própria requisição/transação (quebra dentro de TestCase).
+    """
+    from django.db import connections
+    try:
+        return fn(*args)
+    finally:
+        connections.close_all()
+
 # Regex para localizar a seção "PRESCRIÇÃO E DECADÊNCIA" no parecer
 _RE_PRESCRICAO_SECTION = re.compile(
     r'(\*{0,2}PRESCRI[ÇC][ÃA]O E DECAD[ÊE]NCIA\*{0,2})'  # título (com ou sem negrito/acentos)
@@ -104,8 +119,8 @@ def execute(processo) -> ServiceResult:
             perplexity = PerplexityClient()
             executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
             try:
-                v_future = executor.submit(vertex.search, processo, tese_texto) if not vertex_result else None
-                p_future = executor.submit(perplexity.search_tese, processo, tese_texto) if not perplexity_result else None
+                v_future = executor.submit(_run_in_thread, vertex.search, processo, tese_texto) if not vertex_result else None
+                p_future = executor.submit(_run_in_thread, perplexity.search_tese, processo, tese_texto) if not perplexity_result else None
 
                 if v_future:
                     try:
@@ -119,8 +134,6 @@ def execute(processo) -> ServiceResult:
                         perplexity_result = "Perplexity indisponível."
             finally:
                 executor.shutdown(wait=False)
-                from django.db import close_old_connections
-                close_old_connections()
 
     # Buscar análise de teses (se existir)
     analise_tese_texto = ""

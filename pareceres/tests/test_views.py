@@ -120,12 +120,17 @@ class PastasCRUDTest(BaseViewTest):
         self.assertEqual(resp.status_code, 400)
 
     def test_listar_pastas(self):
+        # api_pastas_listar chama _garantir_pastas_mensais, que cria 12 pastas
+        # mensais automaticamente — então o total é 2 (criadas aqui) + 12.
         Pasta.objects.create(user=self.user, nome="P1", posicao=0)
         Pasta.objects.create(user=self.user, nome="P2", posicao=1)
         resp = self.client.get("/api/pastas/")
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
-        self.assertEqual(len(data["pastas"]), 2)
+        self.assertEqual(len(data["pastas"]), 14)
+        nomes = {p["nome"] for p in data["pastas"]}
+        self.assertIn("P1", nomes)
+        self.assertIn("P2", nomes)
 
     def test_renomear_pasta(self):
         pasta = Pasta.objects.create(user=self.user, nome="Old", posicao=0)
