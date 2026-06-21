@@ -81,11 +81,33 @@ class DocumentAIClient:
         return self.client is not None
 
     def ocr_pdf(self, file_path: str) -> dict | None:
-        """
-        Processa PDF via Document AI OCR, em lotes de _BATCH_SIZE páginas.
+        """OCR de PDF localizado no storage (default_storage)."""
+        if not self.client:
+            return None
+        try:
+            with default_storage.open(file_path, "rb") as f:
+                pdf_bytes = f.read()
+        except Exception as e:
+            _log.error("[DOCAI] Erro lendo do storage: %s — %s", file_path, e)
+            return None
+        return self._ocr_bytes(pdf_bytes, label=file_path)
 
-        Suporta PDFs de qualquer tamanho — divide em blocos de 15 páginas,
-        envia cada bloco ao Document AI, e consolida os resultados.
+    def ocr_pdf_path(self, local_path: str) -> dict | None:
+        """OCR de PDF em caminho local do filesystem (ingestão de normativos)."""
+        if not self.client:
+            return None
+        try:
+            with open(local_path, "rb") as f:
+                pdf_bytes = f.read()
+        except Exception as e:
+            _log.error("[DOCAI] Erro lendo arquivo local: %s — %s", local_path, e)
+            return None
+        return self._ocr_bytes(pdf_bytes, label=local_path)
+
+    def _ocr_bytes(self, pdf_bytes: bytes, label: str = "") -> dict | None:
+        """
+        Core do OCR: processa bytes de PDF via Document AI em lotes de
+        _BATCH_SIZE páginas e consolida os resultados.
 
         Returns:
             {
@@ -106,10 +128,6 @@ class DocumentAIClient:
 
             start = time.time()
 
-            # Ler PDF do storage
-            with default_storage.open(file_path, "rb") as f:
-                pdf_bytes = f.read()
-
             doc = fitz.open(stream=pdf_bytes, filetype="pdf")
             total_pages = len(doc)
 
@@ -125,7 +143,7 @@ class DocumentAIClient:
             for batch_start in range(0, total_pages, _BATCH_SIZE):
                 batch_end = min(batch_start + _BATCH_SIZE, total_pages)
                 _log.info("[DOCAI] Processando lote páginas %d-%d de %d — path=%s",
-                          batch_start + 1, batch_end, total_pages, file_path)
+                          batch_start + 1, batch_end, total_pages, label)
 
                 # Extrair lote como PDF separado
                 batch_doc = fitz.open()
@@ -192,13 +210,13 @@ class DocumentAIClient:
             _log.info(
                 "[DOCAI] OCR OK: %d páginas (%d lotes), confiança=%.1f%%, latency=%dms, path=%s",
                 len(all_paginas), -(-total_pages // _BATCH_SIZE),
-                confianca_media * 100, latency_ms, file_path,
+                confianca_media * 100, latency_ms, label,
             )
 
             return resultado
 
         except Exception as e:
-            _log.error("[DOCAI] Erro OCR: %s — path=%s", e, file_path, exc_info=True)
+            _log.error("[DOCAI] Erro OCR: %s — path=%s", e, label, exc_info=True)
             return None
 
     @staticmethod

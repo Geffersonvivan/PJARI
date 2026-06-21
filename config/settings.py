@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",
     # Local
     "core",
     "pareceres",
@@ -215,6 +216,12 @@ VERTEX_LOCATION = os.environ.get("VERTEX_LOCATION", "us-central1")
 VERTEX_RAG_DATASTORE_ID = os.environ.get("VERTEX_RAG_DATASTORE_ID", "")
 PERPLEXITY_API_KEY = os.environ.get("PERPLEXITY_API_KEY", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+
+# ── RAG (busca de fundamentação normativa) ──────────────────────────────────
+# "local"  → pgvector no Postgres (sentence-transformers, sem custo de nuvem)
+# "vertex" → Vertex AI / Discovery Engine (legado, pago)
+RAG_BACKEND = os.environ.get("RAG_BACKEND", "local")
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
 
 # ── Stripe ───────────────────────────────────────────────────────────────────
 

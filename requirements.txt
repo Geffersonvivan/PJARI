@@ -22,8 +22,11 @@ whitenoise>=6.7
 
 # LLM Integrations
 google-generativeai>=0.8
-google-cloud-aiplatform>=1.60
 anthropic>=0.34
+
+# RAG — busca vetorial local (substitui Vertex AI / Discovery Engine)
+pgvector>=0.3
+sentence-transformers>=2.2
 
 # Monitoring
 sentry-sdk[django,celery,redis]>=2.8
