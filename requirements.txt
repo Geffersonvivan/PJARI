@@ -27,6 +27,11 @@ anthropic>=0.34
 # RAG — busca vetorial local (substitui Vertex AI / Discovery Engine)
 pgvector>=0.3
 sentence-transformers>=2.2
+# torch CPU-only: o Railway roda em CPU, então as libs CUDA do wheel padrão
+# são peso morto (~+1-2 GB de imagem). O índice cpu do PyTorch entrega a build
+# enxuta. Pin casado com o wheel cp314/manylinux_2_28 disponível.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.12.1+cpu
 
 # Monitoring
 sentry-sdk[django,celery,redis]>=2.8
