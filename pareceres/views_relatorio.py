@@ -27,97 +27,97 @@ def _flag_label(valor, nome_positivo, nome_negativo):
     return ""
 
 
+_RESULTADO_LABEL = {
+    "DEFERIDO": "DEFERIDO",
+    "INDEFERIDO": "INDEFERIDO",
+    "NAO_CONHECIDO": "NÃO CONHECIDO",
+}
+
+
+def _juntar_com_e(itens):
+    """['a', 'b', 'c'] -> 'a, b e c'."""
+    itens = [i for i in itens if i]
+    if not itens:
+        return ""
+    if len(itens) == 1:
+        return itens[0]
+    return f"{', '.join(itens[:-1])} e {itens[-1]}"
+
+
 def _montar_item(processo):
-    """Monta as 3 linhas do relatório para um processo."""
+    """Monta o item do relatório no modelo: cabeçalho + síntese + votos.
+
+    Tudo determinístico — sai direto das flags de Admissibilidade e do
+    resultado_final. Sem LLM.
+    """
     # Admissibilidade
     try:
         adm = processo.admissibilidade
     except Exception:
         adm = None
 
-    # Teses
     teses = list(processo.teses.order_by("ordem"))
+    resultado = processo.resultado_final
 
-    # Linha 1: Identificação
+    # ── Cabeçalho: PARECER: NOME / RESULTADO ────────────────────────────────
     numero = processo.pa or f"#{processo.pk}"
     recorrente = processo.recorrente or "Sem nome"
-    linha1 = f"Parecer {numero} — {recorrente}"
+    resultado_label = _RESULTADO_LABEL.get(resultado, "—")
+    cabecalho = f"PARECER: {recorrente} / {resultado_label}"
 
-    # Linha 2: Síntese do caso
+    # ── Síntese (parágrafo único) ───────────────────────────────────────────
     tipo_pen = ""
     if adm and adm.tipo_penalidade:
         tipo_pen = adm.get_tipo_penalidade_display()
 
-    teses_resumo = []
-    for t in teses:
-        teses_resumo.append(t.titulo)
-
-    if teses_resumo:
-        defesa_texto = f"defesa alegou {'; '.join(teses_resumo).lower()}"
-    else:
-        defesa_texto = "sem teses defensivas identificadas"
-
-    linha2 = f"Recurso contra {tipo_pen.lower() or 'penalidade de trânsito'}; {defesa_texto}."
-
-    # Linha 3: Bloco técnico
-    partes = []
-    partes.append(tipo_pen or "Penalidade de trânsito")
-
+    partes = [f"Recurso contra {tipo_pen.lower() or 'penalidade de trânsito'}"]
     if adm:
-        # Tempestividade
-        temp = adm.flag_tempestivo
-        partes.append("tempestivo" if temp else "intempestivo")
+        partes.append("tempestivo" if adm.flag_tempestivo else "intempestivo")
+        partes.append(
+            "com prescrição punitiva" if adm.flag_prescricao_punitiva
+            else "sem prescrição punitiva"
+        )
+        partes.append(
+            "com prescrição intercorrente trienal" if adm.flag_prescricao_intercorrente
+            else "sem prescrição intercorrente trienal"
+        )
+        partes.append(
+            "com prescrição bienal" if adm.flag_prescricao_intercorrente_bienal
+            else "sem prescrição bienal"
+        )
+        partes.append("com decadência" if adm.flag_decadencia else "sem decadência")
+    sintese = "; ".join(partes) + "."
 
-        # Prescrição punitiva
-        if adm.flag_prescricao_punitiva:
-            partes.append("com prescrição punitiva")
+    # Teses defensivas não acolhidas (só onde há teses rejeitadas)
+    rejeitadas = [t for t in teses if t.acolhida is False]
+    if rejeitadas:
+        titulos = _juntar_com_e([t.titulo.strip() for t in rejeitadas if t.titulo])
+        motivos = _juntar_com_e(
+            [t.fundamentacao.strip() for t in rejeitadas if t.fundamentacao]
+        )
+        frase = f" Teses defensivas {titulos} não acolhidas"
+        if motivos:
+            frase += f", em razão de {motivos}"
+        sintese += frase + "."
+
+    # ── Votos (conhecimento + mérito) ───────────────────────────────────────
+    if resultado == "NAO_CONHECIDO":
+        voto_principal = "Voto pelo não conhecimento."
+        voto_subsidiario = "Subsidiariamente, voto pelo indeferimento."
+    else:
+        voto_principal = "Voto pelo conhecimento."
+        if resultado == "DEFERIDO":
+            voto_subsidiario = "Voto pelo deferimento."
         else:
-            partes.append("sem prescrição punitiva")
-
-        # Intercorrente trienal
-        if adm.flag_prescricao_intercorrente:
-            partes.append("com intercorrente trienal")
-        else:
-            partes.append("sem intercorrente trienal")
-
-        # Bienal
-        if adm.flag_prescricao_intercorrente_bienal:
-            partes.append("com bienal")
-        else:
-            partes.append("sem bienal")
-
-        # Decadência
-        if adm.flag_decadencia:
-            partes.append("com decadência")
-        else:
-            partes.append("sem decadência")
-
-    # Teses acolhidas/rejeitadas
-    acolhidas = sum(1 for t in teses if t.acolhida is True)
-    rejeitadas = sum(1 for t in teses if t.acolhida is False)
-    if acolhidas and rejeitadas:
-        partes.append(f"{acolhidas} tese(s) acolhida(s), {rejeitadas} rejeitada(s)")
-    elif acolhidas:
-        partes.append("teses acolhidas")
-    elif rejeitadas:
-        partes.append("teses rejeitadas")
-
-    # Voto
-    resultado = processo.resultado_final
-    if resultado == "DEFERIDO":
-        partes.append("voto pelo deferimento")
-    elif resultado == "INDEFERIDO":
-        partes.append("voto pelo indeferimento")
-    elif resultado == "NAO_CONHECIDO":
-        partes.append("voto pelo não conhecimento")
-
-    linha3 = "; ".join(partes)
+            voto_subsidiario = "Voto pelo indeferimento."
 
     return {
         "processo": processo,
-        "linha1": linha1,
-        "linha2": linha2,
-        "linha3": linha3,
+        "numero": numero,
+        "cabecalho": cabecalho,
+        "sintese": sintese,
+        "voto_principal": voto_principal,
+        "voto_subsidiario": voto_subsidiario,
         "resultado": resultado,
     }
 

@@ -55,9 +55,12 @@
   <div class="space-y-3">
     {% for item in itens %}
     <div class="bg-white rounded-xl border border-gray-100 shadow-sm px-6 py-4 hover:border-gray-200 transition">
-      <!-- Linha 1: Identificação -->
-      <div class="flex items-center justify-between mb-1">
-        <p class="text-sm font-bold text-gray-800">{{ item.linha1 }}</p>
+      <!-- Cabeçalho: PARECER: NOME / RESULTADO -->
+      <div class="flex items-start justify-between mb-1">
+        <div>
+          <p class="text-[10px] font-semibold tracking-wide text-gray-400">{{ item.numero }}</p>
+          <p class="text-sm font-bold text-gray-800">{{ item.cabecalho }}</p>
+        </div>
         {% if item.resultado == "DEFERIDO" %}
         <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">DEFERIDO</span>
         {% elif item.resultado == "INDEFERIDO" %}
@@ -66,10 +69,13 @@
         <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">NÃO CONHECIDO</span>
         {% endif %}
       </div>
-      <!-- Linha 2: Síntese -->
-      <p class="text-xs text-gray-500 leading-relaxed mb-1">{{ item.linha2 }}</p>
-      <!-- Linha 3: Bloco técnico -->
-      <p class="text-xs text-gray-400 leading-relaxed">{{ item.linha3 }}</p>
+      <!-- Síntese (parágrafo único) -->
+      <p class="text-xs text-gray-600 leading-relaxed mt-2">{{ item.sintese }}</p>
+      <!-- Votos -->
+      <div class="text-xs text-gray-700 leading-relaxed mt-2">
+        <p class="font-semibold">{{ item.voto_principal }}</p>
+        <p>{{ item.voto_subsidiario }}</p>
+      </div>
     </div>
     {% endfor %}
   </div>

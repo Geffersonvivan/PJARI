@@ -11,9 +11,11 @@
   .indeferido { color: #b91c1c; }
   .item { border-bottom: 1px solid #e5e5e5; padding: 10px 0; }
   .item:last-child { border-bottom: none; }
+  .numero { font-size: 8px; font-weight: bold; color: #999; margin: 0; letter-spacing: .5px; }
   .linha1 { font-size: 12px; font-weight: bold; margin: 0 0 2px 0; }
-  .linha2 { font-size: 10px; color: #555; margin: 0 0 2px 0; }
-  .linha3 { font-size: 10px; color: #888; margin: 0; }
+  .linha2 { font-size: 10px; color: #555; margin: 0 0 4px 0; }
+  .linha3 { font-size: 10px; color: #333; margin: 0; }
+  .linha3 .principal { font-weight: bold; }
   .badge { font-size: 9px; font-weight: bold; padding: 1px 6px; border-radius: 8px; float: right; }
   .badge-def { background: #dcfce7; color: #15803d; }
   .badge-ind { background: #fee2e2; color: #b91c1c; }
@@ -40,7 +42,6 @@
 {% for item in itens %}
 <div class="item">
   <p class="linha1">
-    {{ item.linha1 }}
     {% if item.resultado == "DEFERIDO" %}
     <span class="badge badge-def">DEFERIDO</span>
     {% elif item.resultado == "INDEFERIDO" %}
@@ -48,9 +49,11 @@
     {% elif item.resultado == "NAO_CONHECIDO" %}
     <span class="badge badge-nc">NÃO CONHECIDO</span>
     {% endif %}
+    <span class="numero">{{ item.numero }}</span><br>
+    {{ item.cabecalho }}
   </p>
-  <p class="linha2">{{ item.linha2 }}</p>
-  <p class="linha3">{{ item.linha3 }}</p>
+  <p class="linha2">{{ item.sintese }}</p>
+  <p class="linha3"><span class="principal">{{ item.voto_principal }}</span><br>{{ item.voto_subsidiario }}</p>
 </div>
 {% empty %}
 <p style="color:#999;text-align:center;padding:40px 0;">Nenhum processo finalizado neste mês.</p>
