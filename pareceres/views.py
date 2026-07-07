@@ -12,7 +12,7 @@ from django.views.decorators.http import require_GET, require_POST
 from .estado import FaseProcesso
 from .models import (
     Admissibilidade, BancoTese, ChatMessage, ComentarioForum, Documento,
-    Parecer, Pasta, PostForum, Processo, log_audit,
+    Parecer, Pasta, PostForum, Processo, log_audit, log_ia_request,
 )
 from .validacao import (
     erros_to_response,
@@ -1134,8 +1134,8 @@ def api_agente_mensagem(request, pk):
         )
         resposta = resp.content[0].text
 
-        log_audit(
-            "ia_request", processo=processo, fase="agente_lateral",
+        log_ia_request(
+            processo, fase="agente_lateral",
             provider="anthropic", model_name="claude-haiku-4-5-20251001",
             input_tokens=resp.usage.input_tokens,
             output_tokens=resp.usage.output_tokens,

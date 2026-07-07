@@ -206,13 +206,12 @@ class GeminiClient:
         if not processo or not response:
             return
         try:
-            from pareceres.models import log_audit
+            from pareceres.models import log_ia_request
             usage = getattr(response, "usage_metadata", None)
             latency_ms = int((time.time() - start_time) * 1000) if start_time else 0
             if usage:
-                log_audit(
-                    "ia_request",
-                    processo=processo,
+                log_ia_request(
+                    processo,
                     fase=fase,
                     provider="Gemini",
                     input_tokens=getattr(usage, "prompt_token_count", 0),

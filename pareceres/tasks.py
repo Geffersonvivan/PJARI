@@ -141,3 +141,14 @@ def auditar_parecer_task(self, processo_id):
         _log.error("[TASK] auditar_parecer erro: %s — processo=%s", exc, processo_id,
                    exc_info=True)
         raise self.retry(exc=exc, countdown=20 * (self.request.retries + 1))
+
+
+@shared_task(queue="fast", ignore_result=True)
+def gravar_audit_task(payload):
+    """Grava um AuditLog de forma assíncrona (fire-and-forget, fila fast).
+
+    Mantém a escrita de auditoria fora do caminho quente (chamadas de LLM,
+    views, threads de RAG). Reaproveita gravar_audit_sync para logar falhas.
+    """
+    from pareceres.models import gravar_audit_sync
+    gravar_audit_sync(payload)

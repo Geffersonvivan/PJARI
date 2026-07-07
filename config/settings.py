@@ -201,6 +201,10 @@ CELERY_TASK_ROUTES = {
 }
 CELERY_TASK_DEFAULT_QUEUE = "fast"
 
+# Auditoria assíncrona: só quando há broker real (prod). Em dev/testes (sem
+# REDIS_URL) o AuditLog grava síncrono, mantendo os testes determinísticos.
+AUDIT_ASYNC = bool(REDIS_URL)
+
 # ── Clerk ────────────────────────────────────────────────────────────────────
 
 CLERK_SECRET_KEY = os.environ.get("CLERK_SECRET_KEY", "")

@@ -98,10 +98,9 @@ class PerplexityClient:
             latency_ms = int((time.time() - start_time) * 1000)
 
             # Log de uso
-            from pareceres.models import log_audit
-            log_audit(
-                "ia_request",
-                processo=processo,
+            from pareceres.models import log_ia_request
+            log_ia_request(
+                processo,
                 fase="Pesquisa Jurisprudência",
                 provider="Perplexity",
                 input_tokens=data.get("usage", {}).get("prompt_tokens", 0),

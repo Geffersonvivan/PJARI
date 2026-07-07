@@ -186,10 +186,9 @@ class AnthropicClient:
             response = _retry_on_rate_limit(_call)
             latency_ms = int((time.time() - start_time) * 1000)
 
-            from pareceres.models import log_audit
-            log_audit(
-                "ia_request",
-                processo=processo,
+            from pareceres.models import log_ia_request
+            log_ia_request(
+                processo,
                 fase="Extração F2",
                 provider="Anthropic",
                 input_tokens=response.usage.input_tokens,
@@ -226,10 +225,9 @@ class AnthropicClient:
             response = _retry_on_rate_limit(_call)
             latency_ms = int((time.time() - start_time) * 1000)
 
-            from pareceres.models import log_audit
-            log_audit(
-                "ia_request",
-                processo=processo,
+            from pareceres.models import log_ia_request
+            log_ia_request(
+                processo,
                 fase="Extração F2 (OCR text)",
                 provider="Anthropic",
                 input_tokens=response.usage.input_tokens,
@@ -297,10 +295,9 @@ class AnthropicClient:
             response = _retry_on_rate_limit(_call)
             latency_ms = int((time.time() - start_time) * 1000)
 
-            from pareceres.models import log_audit
-            log_audit(
-                "ia_request",
-                processo=processo,
+            from pareceres.models import log_ia_request
+            log_ia_request(
+                processo,
                 fase=fase_label,
                 provider="Anthropic",
                 input_tokens=response.usage.input_tokens,
@@ -353,10 +350,9 @@ class AnthropicClient:
             result = _extract_json_block(text)
 
             # Log
-            from pareceres.models import log_audit
-            log_audit(
-                "ia_request",
-                processo=processo,
+            from pareceres.models import log_ia_request
+            log_ia_request(
+                processo,
                 fase="Auditoria F6",
                 provider="Anthropic",
                 input_tokens=response.usage.input_tokens,

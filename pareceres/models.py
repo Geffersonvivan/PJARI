@@ -1,8 +1,13 @@
+import logging
+
+from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import User
 from pgvector.django import VectorField, HnswIndex
 
 from .estado import FaseProcesso
+
+logger = logging.getLogger(__name__)
 
 # Dimensão dos embeddings (paraphrase-multilingual-MiniLM-L12-v2 → 384)
 EMBEDDING_DIM = 384
@@ -383,23 +388,67 @@ class AuditLog(models.Model):
         return f"{self.categoria} | {self.fase} | {self.timestamp:%d/%m/%Y %H:%M}"
 
 
-def log_audit(categoria: str, processo=None, fase: str = "", dados: dict = None, **kwargs):
-    """Helper para registrar auditoria sem bloquear o fluxo principal."""
+def _audit_payload(categoria, processo=None, fase="", dados=None, **kwargs):
+    """Monta um payload JSON-serializável (só primitivos) para o AuditLog.create."""
+    user = kwargs.get("user")
+    user_id = processo.user_id if processo else (user.pk if user else kwargs.get("user_id"))
+    return {
+        "categoria": categoria,
+        "user_id": user_id,
+        "processo_id": processo.pk if processo else kwargs.get("processo_id"),
+        "fase": fase,
+        "dados": dados or {},
+        "provider": kwargs.get("provider", ""),
+        "input_tokens": kwargs.get("input_tokens", 0),
+        "output_tokens": kwargs.get("output_tokens", 0),
+        "latency_ms": kwargs.get("latency_ms", 0),
+        "model_name": kwargs.get("model_name", ""),
+    }
+
+
+def gravar_audit_sync(payload: dict):
+    """Grava o AuditLog de forma síncrona. Falha é LOGADA (não engolida em silêncio)."""
     try:
-        AuditLog.objects.create(
-            categoria=categoria,
-            user=processo.user if processo else kwargs.get("user"),
-            processo=processo,
-            fase=fase,
-            dados=dados or {},
-            provider=kwargs.get("provider", ""),
-            input_tokens=kwargs.get("input_tokens", 0),
-            output_tokens=kwargs.get("output_tokens", 0),
-            latency_ms=kwargs.get("latency_ms", 0),
-            model_name=kwargs.get("model_name", ""),
-        )
+        AuditLog.objects.create(**payload)
     except Exception:
-        pass
+        logger.exception(
+            "Falha ao gravar AuditLog (categoria=%s, fase=%s)",
+            payload.get("categoria"), payload.get("fase"),
+        )
+
+
+def log_audit(categoria: str, processo=None, fase: str = "", dados: dict = None, **kwargs):
+    """Registra auditoria sem bloquear o fluxo principal.
+
+    Em produção (settings.AUDIT_ASYNC — habilitado quando há REDIS_URL) despacha
+    para o Celery na fila `fast`, mantendo o write fora do caminho quente (LLM,
+    views, threads de RAG). Em dev/testes grava síncrono. Qualquer falha é
+    LOGADA, nunca propagada — auditoria nunca derruba o fluxo, mas também nunca
+    some sem rastro.
+    """
+    payload = _audit_payload(categoria, processo, fase, dados, **kwargs)
+    if getattr(settings, "AUDIT_ASYNC", False):
+        try:
+            from pareceres.tasks import gravar_audit_task
+            gravar_audit_task.delay(payload)
+            return
+        except Exception:
+            logger.warning("AuditLog async indisponível — gravando síncrono", exc_info=True)
+    gravar_audit_sync(payload)
+
+
+def log_ia_request(processo, fase, *, provider, input_tokens=0, output_tokens=0,
+                   latency_ms=0, model_name="", dados=None):
+    """Registra uma requisição de IA (categoria 'ia_request') com assinatura TIPADA.
+
+    Sem **kwargs: um argumento errado (ex. `imput_tokens`) vira TypeError na hora,
+    em vez de virar token=0 silencioso — a contabilização de custo de LLM já
+    custou caro para deixar passar em branco. Tokens são opcionais (RAG/Vertex
+    não são cobrados por token)."""
+    log_audit("ia_request", processo=processo, fase=fase, dados=dados,
+              provider=provider, input_tokens=input_tokens,
+              output_tokens=output_tokens, latency_ms=latency_ms,
+              model_name=model_name)
 
 
 # ─── Cache de Teses (otimização Vertex + Perplexity) ────────────────────────

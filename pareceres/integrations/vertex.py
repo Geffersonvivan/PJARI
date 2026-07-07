@@ -147,10 +147,9 @@ class VertexRAGClient:
             latency_ms = int((time.time() - start_time) * 1000)
 
             # Log de uso
-            from pareceres.models import log_audit
-            log_audit(
-                "ia_request",
-                processo=processo,
+            from pareceres.models import log_ia_request
+            log_ia_request(
+                processo,
                 fase="RAG Vertex",
                 provider="Vertex",
                 latency_ms=latency_ms,
@@ -219,10 +218,9 @@ class VertexRAGClient:
 
             latency_ms = int((time.time() - start_time) * 1000)
             try:
-                from pareceres.models import log_audit
-                log_audit(
-                    "ia_request",
-                    processo=processo,
+                from pareceres.models import log_ia_request
+                log_ia_request(
+                    processo,
                     fase="RAG Local",
                     provider="RAG-pgvector",
                     latency_ms=latency_ms,
