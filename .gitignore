@@ -65,3 +65,6 @@ GOOGLE_BILLING_DISPUTE.md
 Consolidado_teste/
 Template_referencia*/
 .github/
+
+# graphify (grafo de conhecimento gerado — artefatos locais)
+graphify-out/
