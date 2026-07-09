@@ -678,10 +678,12 @@ def api_teses_dados(request, pk):
     teses = list(processo.teses.order_by("ordem").values(
         "id", "ordem", "titulo", "fundamentacao", "acolhida"
     ))
-    # Verificar se a tese é a genérica "nenhuma tese identificada"
+    # Placeholder de "sem teses" (extração vazia OU indisponível) → estado manual,
+    # não renderizar como tese real. Detecção canônica no service (#1).
+    from pareceres.services.service_teses import is_placeholder_tese
     sem_teses = (
         len(teses) == 1
-        and "nenhuma tese" in (teses[0].get("titulo", "") or "").lower()
+        and is_placeholder_tese(teses[0].get("titulo", ""))
         and not teses[0].get("fundamentacao")
     )
     return JsonResponse({"teses": teses, "sem_teses": sem_teses})

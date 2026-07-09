@@ -168,6 +168,22 @@ def _distribuir_fundamentacao(teses, analise_texto):
         _log.warning("[TESES-ANALISE] Não foi possível parsear blocos — fallback primeira tese")
 
 
+# Placeholders de "sem teses" — títulos canônicos. A view (api_teses_dados)
+# reconhece esses títulos exatos para exibir o estado "sem teses" em vez de
+# renderizá-los como uma tese defensiva real (#1).
+TITULO_SEM_TESES = "Nenhuma tese defensiva identificada na peça recursal."
+TITULO_EXTRACAO_INDISPONIVEL = (
+    "Extração automática de teses indisponível no momento. "
+    "Verifique manualmente as teses da defesa."
+)
+PLACEHOLDER_TITULOS = frozenset({TITULO_SEM_TESES, TITULO_EXTRACAO_INDISPONIVEL})
+
+
+def is_placeholder_tese(titulo) -> bool:
+    """True se o título é um placeholder de 'sem teses' (não uma tese real)."""
+    return (titulo or "").strip() in PLACEHOLDER_TITULOS
+
+
 def _marcar_sem_teses(processo, titulo, motivo_audit):
     """Cria uma tese-placeholder, avança para TESE_AGUARDANDO e retorna sucesso.
 
@@ -253,8 +269,14 @@ def _extrair_teses_llm(processo, doc, paginas, texto_md, prompt_texto, system_in
                 processo, prompt_texto, system_prompt=system_instruction,
                 max_tokens=2048, temperature=0.1, fase_label="Extração Tese F4 (fallback)",
             )
-            _log.info("[TESES-EXTRACAO] Fallback Anthropic OK processo=%s", processo.id)
-            return (texto or "").strip()
+            # generate_text retorna None em erro (não levanta). Trate None como
+            # falha do provedor → retorne None (degradação), em vez de "" (que
+            # seria lido como "LLM não achou teses" e mostraria a mensagem errada). (#3)
+            if texto is None:
+                _log.error("[TESES-EXTRACAO] Anthropic retornou None (erro) — processo=%s", processo.id)
+            else:
+                _log.info("[TESES-EXTRACAO] Fallback Anthropic OK processo=%s", processo.id)
+                return texto.strip()
         except Exception as e:
             _log.error("[TESES-EXTRACAO] Anthropic também falhou: %s — processo=%s", e, processo.id)
 
@@ -306,8 +328,7 @@ def execute_extracao(processo) -> ServiceResult:
         _log.error("[TESES-EXTRACAO] Extração indisponível (Gemini+Anthropic) — processo=%s", processo.id)
         return _marcar_sem_teses(
             processo,
-            "Extração automática de teses indisponível no momento. "
-            "Verifique manualmente as teses da defesa.",
+            TITULO_EXTRACAO_INDISPONIVEL,
             motivo_audit="Gemini e Anthropic indisponíveis",
         )
 
@@ -315,7 +336,7 @@ def execute_extracao(processo) -> ServiceResult:
     if not tese_extraida:
         return _marcar_sem_teses(
             processo,
-            "Nenhuma tese defensiva identificada na peça recursal.",
+            TITULO_SEM_TESES,
             motivo_audit="LLM não identificou teses no PDF",
         )
 

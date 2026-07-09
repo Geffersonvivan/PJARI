@@ -56,7 +56,9 @@ def _montar_item(processo):
     except Exception:
         adm = None
 
-    teses = list(processo.teses.order_by("ordem"))
+    # .all() usa o cache do prefetch_related("teses") do _contexto_relatorio;
+    # a ordenação já vem de AnaliseTese.Meta.ordering = ["ordem"]. Evita N+1 (#5).
+    teses = list(processo.teses.all())
     resultado = processo.resultado_final
 
     # ── Cabeçalho: PARECER: NOME / RESULTADO ────────────────────────────────

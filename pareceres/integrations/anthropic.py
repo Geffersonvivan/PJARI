@@ -16,6 +16,10 @@ import time
 
 _log = logging.getLogger(__name__)
 
+# Fonte única do modelo Anthropic — evita drift entre `model=` (billado) e
+# `model_name=` (registrado no AuditLog) espalhados pelos métodos.
+SONNET_MODEL = "claude-sonnet-4-6"
+
 _LIMITES = {
     "admissibilidade": 8_000,
     "tabela_datas": 8_000,
@@ -178,7 +182,7 @@ class AnthropicClient:
 
             def _call():
                 return self.client.messages.create(
-                    model="claude-sonnet-4-6",
+                    model=SONNET_MODEL,
                     max_tokens=4096,
                     messages=[{"role": "user", "content": content}],
                 )
@@ -194,7 +198,7 @@ class AnthropicClient:
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,
                 latency_ms=latency_ms,
-                model_name="claude-sonnet-4-6",
+                model_name=SONNET_MODEL,
             )
 
             texto = response.content[0].text
@@ -217,7 +221,7 @@ class AnthropicClient:
 
             def _call():
                 return self.client.messages.create(
-                    model="claude-sonnet-4-6",
+                    model=SONNET_MODEL,
                     max_tokens=1024,
                     messages=[{"role": "user", "content": content}],
                 )
@@ -233,7 +237,7 @@ class AnthropicClient:
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,
                 latency_ms=latency_ms,
-                model_name="claude-sonnet-4-6",
+                model_name=SONNET_MODEL,
             )
 
             texto = response.content[0].text
@@ -279,8 +283,9 @@ class AnthropicClient:
             return None
 
         kwargs = {
-            "model": "claude-sonnet-4-6",
+            "model": SONNET_MODEL,
             "max_tokens": max_tokens,
+            "temperature": temperature,
             "messages": [{"role": "user", "content": user_prompt}],
         }
         if system_prompt:
@@ -303,7 +308,7 @@ class AnthropicClient:
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,
                 latency_ms=latency_ms,
-                model_name="claude-sonnet-4-6",
+                model_name=SONNET_MODEL,
             )
 
             texto = response.content[0].text
@@ -338,7 +343,7 @@ class AnthropicClient:
 
             def _call():
                 return self.client.messages.create(
-                    model="claude-sonnet-4-6",
+                    model=SONNET_MODEL,
                     max_tokens=4096,
                     messages=[{"role": "user", "content": prompt}],
                 )
@@ -358,7 +363,7 @@ class AnthropicClient:
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,
                 latency_ms=latency_ms,
-                model_name="claude-sonnet-4-6",
+                model_name=SONNET_MODEL,
             )
 
             return {

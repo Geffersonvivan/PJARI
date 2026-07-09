@@ -69,7 +69,7 @@ def execute(processo) -> ServiceResult:
     Pós-condição: Parecer criado, processo na fase AUDITORIA.
     """
     import time as _time
-    from pareceres.integrations.anthropic import AnthropicClient
+    from pareceres.integrations.anthropic import AnthropicClient, SONNET_MODEL
     from pareceres.integrations.vertex import VertexRAGClient
     from pareceres.integrations.perplexity import PerplexityClient
     from pareceres.prompts.phase_5 import build_system_instruction
@@ -251,7 +251,7 @@ def execute(processo) -> ServiceResult:
 
     log_audit("fase", processo=processo, fase="parecer_gerado", dados={
         "provider": "Anthropic",
-        "model": "claude-sonnet-4-6",
+        "model": SONNET_MODEL,
         "chars": len(parecer_text),
         "rota": _rota,
         "latency_s": round(_time.time() - t0, 1),
