@@ -21,7 +21,11 @@ google-cloud-storage>=2.16
 whitenoise>=6.7
 
 # LLM Integrations
-google-generativeai>=0.8
+# SDK novo do Gemini: o código usa `from google import genai` + genai.Client +
+# client.models.generate_content (API google-genai 2.x). O pacote antigo
+# google-generativeai NÃO fornece esses símbolos — usá-lo quebra em produção
+# com ImportError: cannot import name 'genai' from 'google'.
+google-genai>=2.0,<3
 anthropic>=0.34
 
 # RAG — busca vetorial local (substitui Vertex AI / Discovery Engine)
