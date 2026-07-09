@@ -12,8 +12,10 @@ celery[redis]>=5.4
 django-celery-beat>=2.6
 
 # Auth (Clerk only)
-PyJWT>=2.8
-cryptography>=42.0
+# Pisos elevados por advisories (pip-audit): PyJWT <2.13.0 e cryptography <48.0.1
+# têm vulnerabilidades — e PyJWT valida o JWT do Clerk em core/middleware.py.
+PyJWT>=2.13.0
+cryptography>=48.0.1
 
 # Storage
 django-storages[google]>=1.14
