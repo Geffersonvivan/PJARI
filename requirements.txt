@@ -1,5 +1,5 @@
-# Django
-Django>=5.1,<6.0
+# Django — piso em 5.2.15 (LTS) por advisories PYSEC-2026-197..201 (pip-audit).
+Django>=5.2.15,<6.0
 gunicorn>=22.0
 uvicorn[standard]>=0.30
 

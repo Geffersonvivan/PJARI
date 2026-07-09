@@ -20,24 +20,11 @@ jobs:
       - name: Ruff (lint)
         run: ruff check pareceres config core
 
-  # ── Segurança de dependências (rápido, sem DB) ───────────────────────────
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-          allow-prereleases: true
-      - run: pip install pip-audit
-      # Não-bloqueante ENQUANTO o Django não for atualizado (fix: 5.2.15 / 6.0.6).
-      # Depois de corrigir o Django, remova o `continue-on-error` para virar
-      # guardrail estrito (falha o build em QUALQUER dependência vulnerável).
-      - name: pip-audit (vulnerabilidades)
-        continue-on-error: true
-        run: pip-audit -r requirements.txt
-
-  # ── Testes (Postgres + pgvector + Redis) ─────────────────────────────────
+  # ── Testes + auditoria de segurança (Postgres + pgvector) ────────────────
+  # A auditoria roda AQUI (não num job separado) porque só o ambiente já
+  # instalado resolve o wheel `torch==2.12.1+cpu` (índice do PyTorch); o
+  # `pip-audit -r requirements.txt` isolado não consegue e falharia por
+  # resolução, não por vulnerabilidade.
   test:
     runs-on: ubuntu-latest
     services:
@@ -94,3 +81,10 @@ jobs:
 
       - name: Check for missing migrations
         run: python manage.py makemigrations --check --dry-run
+
+      # BLOQUEANTE: audita as dependências REAIS instaladas (inclui torch cpu +
+      # pip já atualizado). Falha o build em QUALQUER vulnerabilidade conhecida.
+      - name: Auditoria de dependências (pip-audit)
+        run: |
+          pip install pip-audit
+          pip-audit --progress-spinner off
