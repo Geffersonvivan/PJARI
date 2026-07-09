@@ -166,7 +166,7 @@ class VertexRAGClient:
             return texto
         except Exception as e:
             _log.error("Erro Vertex RAG: %s — fallback para busca local", e)
-            return self._search_local(query, top_k)
+            return self._search_local(query, top_k, processo=processo)
 
     def _search_local(self, query: str, top_k: int = 5, processo=None) -> str:
         """

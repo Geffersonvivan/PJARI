@@ -20,6 +20,17 @@ _log = logging.getLogger(__name__)
 # `model_name=` (registrado no AuditLog) espalhados pelos métodos.
 SONNET_MODEL = "claude-sonnet-4-6"
 
+
+def _texto_resposta(response):
+    """Texto do 1º bloco da resposta, ou None em refusal/conteúdo vazio.
+
+    Evita IndexError quando o Claude recusa (stop_reason='refusal' → content
+    vazio) ou devolve conteúdo sem texto.
+    """
+    if getattr(response, "stop_reason", None) == "refusal" or not response.content:
+        return None
+    return getattr(response.content[0], "text", None)
+
 _LIMITES = {
     "admissibilidade": 8_000,
     "tabela_datas": 8_000,
@@ -201,7 +212,7 @@ class AnthropicClient:
                 model_name=SONNET_MODEL,
             )
 
-            texto = response.content[0].text
+            texto = _texto_resposta(response)
             _log.info("[ANTHROPIC] Extração OK processo=%s tokens_in=%d tokens_out=%d latency=%dms",
                       processo.id, response.usage.input_tokens, response.usage.output_tokens, latency_ms)
             return texto
@@ -240,7 +251,7 @@ class AnthropicClient:
                 model_name=SONNET_MODEL,
             )
 
-            texto = response.content[0].text
+            texto = _texto_resposta(response)
             _log.info("[ANTHROPIC] Extração OCR text OK processo=%s tokens_in=%d latency=%dms",
                       processo.id, response.usage.input_tokens, latency_ms)
             return texto
@@ -311,7 +322,7 @@ class AnthropicClient:
                 model_name=SONNET_MODEL,
             )
 
-            texto = response.content[0].text
+            texto = _texto_resposta(response)
             _log.info("[ANTHROPIC] %s OK processo=%s tokens_in=%d tokens_out=%d latency=%dms",
                       fase_label, processo.id, response.usage.input_tokens,
                       response.usage.output_tokens, latency_ms)
@@ -351,7 +362,10 @@ class AnthropicClient:
             response = _retry_on_rate_limit(_call)
             latency_ms = int((time.time() - start_time) * 1000)
 
-            text = response.content[0].text
+            text = _texto_resposta(response)
+            if text is None:
+                _log.error("[ANTHROPIC] Auditoria: resposta vazia/refusal — processo=%s", processo.id)
+                return {"score": None, "detalhes": "Anthropic recusou ou retornou vazio", "checklist": []}
             result = _extract_json_block(text)
 
             # Log
