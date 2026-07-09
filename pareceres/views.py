@@ -93,15 +93,6 @@ def processo_wizard(request, pk):
     processo = _get_processo_or_404(request, pk)
     passo_atual = FaseProcesso.passo_wizard(processo.fase)
 
-    # Deep-link para reabrir um passo JÁ CONCLUÍDO (ex.: "Editar" o parecer a
-    # partir do relatório mensal). Só permite voltar (<= passo atual), nunca
-    # pular à frente. Salvar o parecer independe da fase (api_parecer_editar).
-    passo_req = request.GET.get("passo")
-    if passo_req and passo_req.isdigit():
-        n = int(passo_req)
-        if 1 <= n <= passo_atual:
-            passo_atual = n
-
     docs = {
         d.tipo: True
         for d in processo.documentos.only("tipo").all()

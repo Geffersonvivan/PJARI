@@ -62,7 +62,7 @@
           <p class="text-sm font-bold text-gray-800">{{ item.cabecalho }}</p>
         </div>
         <div class="flex items-center gap-2">
-          <a href="{% url 'pareceres:processo_wizard' pk=item.processo.pk %}?passo=5"
+          <a href="{% url 'pareceres:processo_wizard' pk=item.processo.pk %}"
              class="btn-editar inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition"
              style="text-decoration:none;">
             <i class="ph ph-pencil-simple" style="font-size:14px;"></i>
