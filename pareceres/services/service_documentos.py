@@ -231,7 +231,6 @@ def _validar_datas(resultado: dict) -> dict:
     di = datas.get("DATA_INFRACAO")
     dna = datas.get("DATA_NA")
     dnp = datas.get("DATA_NP")
-    dinst = datas.get("DATA_INSTAURACAO")
 
     if di and dna and di > dna:
         alertas.append(f"DATA_INFRACAO ({di}) > DATA_NA ({dna})")

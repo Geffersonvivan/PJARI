@@ -87,7 +87,7 @@ def api_tier_config(request):
             "tier_global": config.tier_padrao,
             "tier_user": tier_user,
             "tier_efetivo": tier_user or config.tier_padrao,
-            "opcoes": [{"value": v, "label": l} for v, l in TIER_CHOICES],
+            "opcoes": [{"value": v, "label": label} for v, label in TIER_CHOICES],
         })
 
     if request.method == "POST":

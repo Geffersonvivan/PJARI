@@ -11,7 +11,7 @@ from django.test import TestCase, Client
 
 from pareceres.estado import FaseProcesso
 from pareceres.models import (
-    Admissibilidade, AnaliseTese, Documento, Parecer, Pasta, Processo,
+    Parecer, Pasta, Processo,
 )
 
 

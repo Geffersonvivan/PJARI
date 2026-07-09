@@ -302,15 +302,6 @@ def execute(processo) -> ServiceResult:
     if processo.prazo_final and processo.data_protocolo:
         dias_tempestividade = JariMath.calculate_days_diff(processo.prazo_final, processo.data_protocolo)
 
-    ultimo_marco = max(marcos_validos) if marcos_validos else data_infracao
-
-    if "NÃO SE APLICA" in relatorio_decad:
-        decadencia_final = "NÃO SE APLICA"
-    elif adm.has_decadencia:
-        decadencia_final = "SIM"
-    else:
-        decadencia_final = "NÃO"
-
     # ── Fundamentações individuais por critério (para Fase 3 / UI) ────────
     fund_tempestivo = (
         f"Diferença em dias corridos = {dias_tempestividade} dias. "

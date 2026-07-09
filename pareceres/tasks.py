@@ -13,7 +13,6 @@ import logging
 
 from celery import shared_task
 
-from pareceres.estado import FaseProcesso
 
 _log = logging.getLogger(__name__)
 

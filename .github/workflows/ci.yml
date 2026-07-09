@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Lint (rápido, sem DB) ────────────────────────────────────────────────
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+      - run: pip install ruff
+      - name: Ruff (lint)
+        run: ruff check pareceres config core
+
+  # ── Segurança de dependências (rápido, sem DB) ───────────────────────────
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+      - run: pip install pip-audit
+      # Não-bloqueante ENQUANTO o Django não for atualizado (fix: 5.2.15 / 6.0.6).
+      # Depois de corrigir o Django, remova o `continue-on-error` para virar
+      # guardrail estrito (falha o build em QUALQUER dependência vulnerável).
+      - name: pip-audit (vulnerabilidades)
+        continue-on-error: true
+        run: pip-audit -r requirements.txt
+
+  # ── Testes (Postgres + pgvector + Redis) ─────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pjari_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings
+      SECRET_KEY: ci-test-secret-key
+      DEBUG: "True"
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pjari_test
+      # REDIS_URL propositalmente AUSENTE: mantém AUDIT_ASYNC=False (gravação
+      # síncrona do AuditLog), deixando os testes determinísticos como no local.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install system dependencies (WeasyPrint)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests (cria o banco de teste + extensão pgvector via migração)
+        run: python manage.py test --verbosity=2
+
+      - name: Check for missing migrations
+        run: python manage.py makemigrations --check --dry-run

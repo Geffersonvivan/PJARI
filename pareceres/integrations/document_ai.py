@@ -8,11 +8,9 @@ Responsabilidades:
 Usa o processor Document OCR pré-treinado (suporte a 200+ idiomas, incluindo pt-BR).
 """
 
-import io
 import json
 import logging
 import os
-import tempfile
 import time
 
 from django.core.files.storage import default_storage

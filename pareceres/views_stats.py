@@ -7,7 +7,7 @@ import json
 from datetime import date
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Avg, Count, Q, Sum
+from django.db.models import Avg, Count, Sum
 from django.db.models.functions import TruncDate
 from django.http import HttpResponseForbidden
 from django.shortcuts import render

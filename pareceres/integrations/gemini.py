@@ -15,7 +15,6 @@ import tempfile
 import threading
 import time
 
-from django.conf import settings
 from django.core.files.storage import default_storage
 
 _log = logging.getLogger(__name__)
@@ -157,7 +156,6 @@ class GeminiClient:
         Chama generate_content com retry + fallback automático.
         Retorna (response, model_used).
         """
-        from google.genai import types
 
         retry_delays = [3, 8]
         sequence = [model] * (1 + max_retries)

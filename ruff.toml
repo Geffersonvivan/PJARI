@@ -1,0 +1,17 @@
+# Configuração do Ruff — lint do P-JARI
+target-version = "py314"
+line-length = 100
+
+# Nunca lintar o projeto de referência (read-only) nem artefatos gerados.
+extend-exclude = [
+    "P-Jari_antigo",
+    "graphify-out",
+    "staticfiles",
+    "venv",
+    "*/migrations/*",
+]
+
+[lint]
+# Padrão do Ruff (E4/E7/E9 + F): erros reais — imports/variáveis não usados,
+# nomes ambíguos, erros de sintaxe. E501 (comprimento de linha) fica de fora
+# para evitar ruído; o foco é bug/higiene, não formatação.

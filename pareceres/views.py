@@ -917,7 +917,7 @@ def api_auditoria_finalizar(request, pk):
 def api_pastas_listar(request):
     """Lista pastas do usuário com contagem de processos."""
     _garantir_pastas_mensais(request.user)
-    from django.db.models import Count, Max
+    from django.db.models import Count
     pastas = request.user.pastas.annotate(
         qtd_processos=Count("processos")
     ).values("id", "nome", "posicao", "qtd_processos")
