@@ -84,16 +84,15 @@ def validar_dados_extraidos(processo) -> list[ErroValidacao]:
             solucao="Informe as páginas da defesa recursal (ex: 15-30).",
         ))
 
-    # Data da infração (vive na Admissibilidade)
+    # Data da infração (vive na Admissibilidade). Só a AUSÊNCIA da Admissibilidade
+    # (reverse OneToOne) conta como "não informada"; erro de infra deve propagar,
+    # não virar um falso "data não informada".
+    from django.core.exceptions import ObjectDoesNotExist
     try:
-        adm = processo.admissibilidade
-        if not adm.data_infracao:
-            erros.append(ErroValidacao(
-                campo="data_infracao",
-                mensagem="Data da Infração não informada.",
-                solucao="Consulte o PDF e preencha a Data da Infração.",
-            ))
-    except Exception:
+        sem_data_infracao = not processo.admissibilidade.data_infracao
+    except ObjectDoesNotExist:
+        sem_data_infracao = True
+    if sem_data_infracao:
         erros.append(ErroValidacao(
             campo="data_infracao",
             mensagem="Data da Infração não informada.",

@@ -166,8 +166,11 @@ def estatisticas_gerais_view(request):
 
     # Custos IA (do AuditLog)
     from datetime import datetime as dt
-    inicio_mes = dt(ano, mes, 1)
-    fim_mes = dt(ano, mes + 1, 1) if mes < 12 else dt(ano + 1, 1, 1)
+
+    from django.utils import timezone
+    # Aware para filtrar AuditLog.timestamp (aware) sem RuntimeWarning/off-by-tz.
+    inicio_mes = timezone.make_aware(dt(ano, mes, 1))
+    fim_mes = timezone.make_aware(dt(ano, mes + 1, 1) if mes < 12 else dt(ano + 1, 1, 1))
     logs = AuditLog.objects.filter(
         categoria="ia_request",
         timestamp__gte=inicio_mes,

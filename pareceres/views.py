@@ -441,9 +441,7 @@ def api_dados_extraidos(request, pk):
 @require_POST
 def api_documentos_upload(request, pk):
     """Upload do PDF consolidado e dispara extração via Celery."""
-    print(f"[DEBUG] api_documentos_upload chamada pk={pk}")
     processo = get_object_or_404(Processo, pk=pk, user=request.user)
-    print(f"[DEBUG] processo.fase={processo.fase}")
 
     if processo.fase != FaseProcesso.DOCUMENTOS:
         return JsonResponse({"error": "Processo não está na fase de documentos."}, status=400)

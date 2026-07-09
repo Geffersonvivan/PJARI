@@ -90,7 +90,8 @@ class Processo(models.Model):
         verbose_name_plural = "Processos"
 
     def __str__(self):
-        return f"PA {self.pa or '(sem PA)'} — {self.user.username}"
+        usuario = self.user.username if self.user_id else "(sem usuário)"
+        return f"PA {self.pa or '(sem PA)'} — {usuario}"
 
     def avancar_fase(self, proxima: str):
         """Transição de fase com validação."""
