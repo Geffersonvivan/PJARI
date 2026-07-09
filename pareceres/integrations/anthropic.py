@@ -178,7 +178,7 @@ class AnthropicClient:
 
             def _call():
                 return self.client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-6",
                     max_tokens=4096,
                     messages=[{"role": "user", "content": content}],
                 )
@@ -194,7 +194,7 @@ class AnthropicClient:
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,
                 latency_ms=latency_ms,
-                model_name="claude-sonnet-4-20250514",
+                model_name="claude-sonnet-4-6",
             )
 
             texto = response.content[0].text
@@ -217,7 +217,7 @@ class AnthropicClient:
 
             def _call():
                 return self.client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-6",
                     max_tokens=1024,
                     messages=[{"role": "user", "content": content}],
                 )
@@ -233,7 +233,7 @@ class AnthropicClient:
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,
                 latency_ms=latency_ms,
-                model_name="claude-sonnet-4-20250514",
+                model_name="claude-sonnet-4-6",
             )
 
             texto = response.content[0].text
@@ -279,7 +279,7 @@ class AnthropicClient:
             return None
 
         kwargs = {
-            "model": "claude-sonnet-4-20250514",
+            "model": "claude-sonnet-4-6",
             "max_tokens": max_tokens,
             "messages": [{"role": "user", "content": user_prompt}],
         }
@@ -303,7 +303,7 @@ class AnthropicClient:
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,
                 latency_ms=latency_ms,
-                model_name="claude-sonnet-4-20250514",
+                model_name="claude-sonnet-4-6",
             )
 
             texto = response.content[0].text
@@ -338,7 +338,7 @@ class AnthropicClient:
 
             def _call():
                 return self.client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-6",
                     max_tokens=4096,
                     messages=[{"role": "user", "content": prompt}],
                 )
@@ -358,7 +358,7 @@ class AnthropicClient:
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,
                 latency_ms=latency_ms,
-                model_name="claude-sonnet-4-20250514",
+                model_name="claude-sonnet-4-6",
             )
 
             return {

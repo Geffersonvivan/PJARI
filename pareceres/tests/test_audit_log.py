@@ -20,7 +20,7 @@ class LogAuditSyncTest(TestCase):
         log_ia_request(
             None, fase="Extração F2", provider="Anthropic",
             input_tokens=120, output_tokens=45, latency_ms=800,
-            model_name="claude-sonnet-4-20250514",
+            model_name="claude-sonnet-4-6",
         )
         log = AuditLog.objects.get(categoria="ia_request")
         self.assertEqual(log.provider, "Anthropic")

@@ -251,7 +251,7 @@ def execute(processo) -> ServiceResult:
 
     log_audit("fase", processo=processo, fase="parecer_gerado", dados={
         "provider": "Anthropic",
-        "model": "claude-sonnet-4-20250514",
+        "model": "claude-sonnet-4-6",
         "chars": len(parecer_text),
         "rota": _rota,
         "latency_s": round(_time.time() - t0, 1),
