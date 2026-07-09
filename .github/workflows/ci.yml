@@ -86,6 +86,9 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Collect static (constrói o manifest exigido pelos testes de template)
+        run: python manage.py collectstatic --noinput
+
       - name: Run tests (cria o banco de teste + extensão pgvector via migração)
         run: python manage.py test --verbosity=2
 
