@@ -57,11 +57,13 @@ class LogAuditSyncTest(TestCase):
 
 class LogAuditAsyncTest(TestCase):
     @override_settings(AUDIT_ASYNC=True)
-    def test_async_despacha_task_e_nao_grava_sincrono(self):
-        # Fix 3: com AUDIT_ASYNC, delega ao Celery e não grava direto.
+    def test_async_despacha_task_apos_commit(self):
+        # Fix 3/#4: com AUDIT_ASYNC, delega ao Celery — mas só via on_commit
+        # (o worker só insere depois do commit). captureOnCommitCallbacks simula.
         with patch("pareceres.tasks.gravar_audit_task.delay") as mock_delay:
-            log_ia_request(None, fase="Extração F2", provider="Gemini",
-                           input_tokens=10, output_tokens=5)
+            with self.captureOnCommitCallbacks(execute=True):
+                log_ia_request(None, fase="Extração F2", provider="Gemini",
+                               input_tokens=10, output_tokens=5)
             self.assertEqual(mock_delay.call_count, 1)
             payload = mock_delay.call_args[0][0]
             self.assertEqual(payload["categoria"], "ia_request")
@@ -74,5 +76,6 @@ class LogAuditAsyncTest(TestCase):
         # Broker fora do ar -> cai no gravar_audit_sync, registro é criado mesmo assim.
         with patch("pareceres.tasks.gravar_audit_task.delay", side_effect=OSError("no broker")), \
              patch("pareceres.models.logger"):
-            log_ia_request(None, fase="Extração F2", provider="Gemini")
+            with self.captureOnCommitCallbacks(execute=True):
+                log_ia_request(None, fase="Extração F2", provider="Gemini")
         self.assertTrue(AuditLog.objects.filter(categoria="ia_request").exists())

@@ -248,39 +248,28 @@ def _extrair_teses_gemini(processo, doc, paginas, texto_md, prompt_texto, system
 
 
 def _extrair_teses_llm(processo, doc, paginas, texto_md, prompt_texto, system_instruction):
-    """Gemini → (fallback) Anthropic.
+    """Gemini (primário) → Anthropic (fallback, só pela via textual do OCR).
 
-    Retorna:
-      str  — teses extraídas (pode ser "" quando o LLM não identifica teses)
-      None — ambos os provedores indisponíveis (o chamador degrada graciosamente)
+    Retorna str (pode ser "" quando o LLM não identifica teses) ou None quando
+    ambos os provedores falham (o chamador degrada graciosamente). O Anthropic
+    retorna None em erro; o helper trata isso como falha do provedor (#3). (#6)
     """
-    # 1. Gemini (primário)
-    try:
+    from pareceres.services.llm import chamar_com_fallback
+
+    def _gemini():
         return _extrair_teses_gemini(processo, doc, paginas, texto_md, prompt_texto, system_instruction)
-    except Exception as e:
-        _log.error("[TESES-EXTRACAO] Gemini falhou: %s — processo=%s%s", e, processo.id,
-                   " — tentando Anthropic" if prompt_texto else "")
 
-    # 2. Anthropic (fallback — só pela via textual do OCR; sem MD não há como cair aqui)
-    if prompt_texto:
-        try:
-            from pareceres.integrations.anthropic import AnthropicClient
-            texto = AnthropicClient().generate_text(
-                processo, prompt_texto, system_prompt=system_instruction,
-                max_tokens=2048, temperature=0.1, fase_label="Extração Tese F4 (fallback)",
-            )
-            # generate_text retorna None em erro (não levanta). Trate None como
-            # falha do provedor → retorne None (degradação), em vez de "" (que
-            # seria lido como "LLM não achou teses" e mostraria a mensagem errada). (#3)
-            if texto is None:
-                _log.error("[TESES-EXTRACAO] Anthropic retornou None (erro) — processo=%s", processo.id)
-            else:
-                _log.info("[TESES-EXTRACAO] Fallback Anthropic OK processo=%s", processo.id)
-                return texto.strip()
-        except Exception as e:
-            _log.error("[TESES-EXTRACAO] Anthropic também falhou: %s — processo=%s", e, processo.id)
+    def _anthropic():
+        if not prompt_texto:  # sem OCR não há via textual pro Anthropic
+            return None
+        from pareceres.integrations.anthropic import AnthropicClient
+        texto = AnthropicClient().generate_text(
+            processo, prompt_texto, system_prompt=system_instruction,
+            max_tokens=2048, temperature=0.1, fase_label="Extração Tese F4 (fallback)",
+        )
+        return texto.strip() if texto is not None else None
 
-    return None
+    return chamar_com_fallback(_gemini, _anthropic, label=f"teses processo={processo.id}")
 
 
 def execute_extracao(processo) -> ServiceResult:

@@ -185,21 +185,38 @@ def execute(processo) -> ServiceResult:
         f"Gere o PARECER TÉCNICO FINAL conforme as regras do SYSTEM."
     )
 
-    # ── Geração via Anthropic (Claude) ───────────────────────────────────
-    anthropic = AnthropicClient()
-    parecer_text = anthropic.generate_text(
-        processo, prompt_user,
-        system_prompt=system_instruction,
-        max_tokens=8192,
-        temperature=0.3,
-        fase_label="Parecer F5",
+    # ── Geração: Anthropic (primário) com fallback Gemini (#8) ──────────────
+    from pareceres.services.llm import chamar_com_fallback
+
+    def _anthropic_parecer():
+        return AnthropicClient().generate_text(
+            processo, prompt_user, system_prompt=system_instruction,
+            max_tokens=8192, temperature=0.3, fase_label="Parecer F5",
+        )
+
+    def _gemini_parecer():
+        import time as _tp
+        from pareceres.integrations.gemini import GeminiClient
+        g = GeminiClient()
+        _t0g = _tp.time()
+        resp, model_used = g.generate(
+            model="gemini-2.5-flash", contents=[prompt_user],
+            config={"temperature": 0.3, "max_output_tokens": 8192,
+                    "system_instruction": system_instruction},
+            timeout_per_call=120,
+        )
+        g.log_usage(processo, resp, "Parecer F5 (fallback)", model_used, _t0g)
+        return (resp.text or "").strip() or None
+
+    parecer_text = chamar_com_fallback(
+        _anthropic_parecer, _gemini_parecer, label=f"parecer processo={processo.id}"
     )
 
     if not parecer_text:
-        _log.error("[PARECER] Anthropic falhou — processo=%s", processo.id)
+        _log.error("[PARECER] Anthropic e Gemini falharam — processo=%s", processo.id)
         processo.fase = FaseProcesso.PARECER
         processo.save(update_fields=["fase"])
-        return ServiceResult.falha("Erro ao gerar parecer: Anthropic indisponível.")
+        return ServiceResult.falha("Erro ao gerar parecer: LLMs indisponíveis.")
 
     parecer_text = parecer_text.strip()
 

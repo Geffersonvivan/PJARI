@@ -12,6 +12,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpResponse
 from django.shortcuts import render
 from django.template.loader import render_to_string
+from django.utils.text import get_text_list
 
 from .models import Pasta
 
@@ -25,23 +26,6 @@ def _flag_label(valor, nome_positivo, nome_negativo):
     if valor is False:
         return nome_negativo
     return ""
-
-
-_RESULTADO_LABEL = {
-    "DEFERIDO": "DEFERIDO",
-    "INDEFERIDO": "INDEFERIDO",
-    "NAO_CONHECIDO": "NÃO CONHECIDO",
-}
-
-
-def _juntar_com_e(itens):
-    """['a', 'b', 'c'] -> 'a, b e c'."""
-    itens = [i for i in itens if i]
-    if not itens:
-        return ""
-    if len(itens) == 1:
-        return itens[0]
-    return f"{', '.join(itens[:-1])} e {itens[-1]}"
 
 
 def _montar_item(processo):
@@ -64,7 +48,9 @@ def _montar_item(processo):
     # ── Cabeçalho: PARECER: NOME / RESULTADO ────────────────────────────────
     numero = processo.pa or f"#{processo.pk}"
     recorrente = processo.recorrente or "Sem nome"
-    resultado_label = _RESULTADO_LABEL.get(resultado, "—")
+    # Label do resultado a partir dos próprios choices do model (#10) — não
+    # duplica o enum; um novo resultado_final aparece automaticamente.
+    resultado_label = (processo.get_resultado_final_display() or "—").upper()
     cabecalho = f"PARECER: {recorrente} / {resultado_label}"
 
     # ── Síntese (parágrafo único) ───────────────────────────────────────────
@@ -93,9 +79,9 @@ def _montar_item(processo):
     # Teses defensivas não acolhidas (só onde há teses rejeitadas)
     rejeitadas = [t for t in teses if t.acolhida is False]
     if rejeitadas:
-        titulos = _juntar_com_e([t.titulo.strip() for t in rejeitadas if t.titulo])
-        motivos = _juntar_com_e(
-            [t.fundamentacao.strip() for t in rejeitadas if t.fundamentacao]
+        titulos = get_text_list([t.titulo.strip() for t in rejeitadas if t.titulo], "e")
+        motivos = get_text_list(
+            [t.fundamentacao.strip() for t in rejeitadas if t.fundamentacao], "e"
         )
         frase = f" Teses defensivas {titulos} não acolhidas"
         if motivos:

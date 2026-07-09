@@ -1,7 +1,7 @@
 import logging
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth.models import User
 from pgvector.django import VectorField, HnswIndex
 
@@ -430,10 +430,20 @@ def log_audit(categoria: str, processo=None, fase: str = "", dados: dict = None,
     if getattr(settings, "AUDIT_ASYNC", False):
         try:
             from pareceres.tasks import gravar_audit_task
-            gravar_audit_task.delay(payload)
-            return
         except Exception:
-            logger.warning("AuditLog async indisponível — gravando síncrono", exc_info=True)
+            gravar_audit_task = None
+        if gravar_audit_task is not None:
+            def _dispatch():
+                try:
+                    gravar_audit_task.delay(payload)
+                except Exception:
+                    logger.warning("AuditLog async indisponível — gravando síncrono", exc_info=True)
+                    gravar_audit_sync(payload)
+            # on_commit: o worker só insere DEPOIS do commit — evita FK violation
+            # com o Processo/User ainda não commitados. Fora de transação (o caso
+            # comum: task Celery, view sem ATOMIC_REQUESTS) roda imediatamente. (#4)
+            transaction.on_commit(_dispatch)
+            return
     gravar_audit_sync(payload)
 
 
