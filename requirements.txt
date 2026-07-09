@@ -16,6 +16,8 @@ django-celery-beat>=2.6
 # têm vulnerabilidades — e PyJWT valida o JWT do Clerk em core/middleware.py.
 PyJWT>=2.13.0
 cryptography>=48.0.1
+# Verificação de assinatura dos webhooks do Clerk (obrigatória — fail-closed).
+svix>=1.0
 
 # Storage
 django-storages[google]>=1.14

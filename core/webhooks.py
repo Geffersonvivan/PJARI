@@ -1,4 +1,3 @@
-import json
 import logging
 
 from django.conf import settings
@@ -18,22 +17,26 @@ def clerk_webhook(request):
     if not secret:
         return HttpResponseForbidden("Webhook secret not configured")
 
-    # Verificar assinatura Svix
+    # Verificação de assinatura Svix — OBRIGATÓRIA (fail-closed).
+    # Sem svix instalado, NÃO aceitamos o evento: este endpoint cria/deleta
+    # usuários e apaga processos em cascata; aceitar sem verificar deixaria a
+    # rota pública explorável com eventos forjados.
     try:
         from svix.webhooks import Webhook, WebhookVerificationError
+    except ImportError:
+        logger.error("svix não instalado — webhook Clerk rejeitado (fail-closed)")
+        return HttpResponseForbidden("Signature verification unavailable")
 
-        headers = {
-            "svix-id": request.headers.get("svix-id"),
-            "svix-timestamp": request.headers.get("svix-timestamp"),
-            "svix-signature": request.headers.get("svix-signature"),
-        }
+    headers = {
+        "svix-id": request.headers.get("svix-id"),
+        "svix-timestamp": request.headers.get("svix-timestamp"),
+        "svix-signature": request.headers.get("svix-signature"),
+    }
+    try:
         wh = Webhook(secret)
         evt = wh.verify(request.body.decode("utf-8"), headers)
     except WebhookVerificationError:
         return HttpResponseForbidden("Invalid signature")
-    except ImportError:
-        # svix não instalado — aceitar sem verificação em dev
-        evt = json.loads(request.body)
 
     event_type = evt.get("type")
     data = evt.get("data", {})
