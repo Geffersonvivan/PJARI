@@ -168,20 +168,110 @@ def _distribuir_fundamentacao(teses, analise_texto):
         _log.warning("[TESES-ANALISE] Não foi possível parsear blocos — fallback primeira tese")
 
 
+def _marcar_sem_teses(processo, titulo, motivo_audit):
+    """Cria uma tese-placeholder, avança para TESE_AGUARDANDO e retorna sucesso.
+
+    Convergência única para os casos em que não há teses a analisar: o LLM não
+    identificou nenhuma OU a extração ficou indisponível. Em ambos o julgador
+    chega à tela de teses e decide manualmente — em vez de a task ficar em retry
+    e o front girar até o timeout de 5 min.
+    """
+    processo.teses.all().delete()
+    AnaliseTese.objects.create(processo=processo, ordem=1, titulo=titulo)
+    processo.avancar_fase(FaseProcesso.TESE_AGUARDANDO)
+    log_audit("fase", processo=processo, fase="teses_sem_extracao",
+              dados={"motivo": motivo_audit})
+    _log.info("[TESES-EXTRACAO] OK (sem teses: %s) processo=%s", motivo_audit, processo.id)
+    return ServiceResult.sucesso(
+        "Nenhuma tese identificada. O julgador pode verificar manualmente.",
+        teses_count=0,
+    )
+
+
+def _extrair_teses_gemini(processo, doc, paginas, texto_md, prompt_texto, system_instruction):
+    """Extrai teses via Gemini (texto MD ou upload do PDF). Retorna str (pode ser ""). Lança em falha."""
+    import time as _time
+    from pareceres.integrations.gemini import GeminiClient
+
+    gemini = GeminiClient()
+    if texto_md:
+        _log.info("[TESES-EXTRACAO] Gemini via MD (%d chars) processo=%s", len(texto_md), processo.id)
+        contents = [prompt_texto]
+    else:
+        _log.info("[TESES-EXTRACAO] Gemini via PDF processo=%s", processo.id)
+        pdf_recortado = _extrair_paginas_defesa(doc.arquivo.name, paginas)
+        if pdf_recortado:
+            uploaded = gemini.upload_file_from_path(pdf_recortado)
+            try:
+                os.unlink(pdf_recortado)
+            except Exception:
+                pass
+        else:
+            uploaded = gemini.upload_file(doc.arquivo.name)
+        if not uploaded:
+            raise RuntimeError("Falha no upload do PDF para o Gemini")
+        contents = [uploaded, (
+            "O documento anexo contém EXCLUSIVAMENTE a defesa recursal do recorrente. "
+            "Extraia TODAS as teses defensivas apresentadas, cada uma separadamente, "
+            "no formato exato: 'Tese N: [resumo]'."
+        )]
+
+    t0 = _time.time()
+    response, model_used = gemini.generate(
+        model="gemini-2.5-flash",
+        contents=contents,
+        config={
+            "temperature": 0.1,
+            "max_output_tokens": 2048,
+            "system_instruction": system_instruction,
+        },
+        timeout_per_call=90,
+    )
+    gemini.log_usage(processo, response, "Extração Tese F4", model_used, t0)
+    return (response.text or "").strip()
+
+
+def _extrair_teses_llm(processo, doc, paginas, texto_md, prompt_texto, system_instruction):
+    """Gemini → (fallback) Anthropic.
+
+    Retorna:
+      str  — teses extraídas (pode ser "" quando o LLM não identifica teses)
+      None — ambos os provedores indisponíveis (o chamador degrada graciosamente)
+    """
+    # 1. Gemini (primário)
+    try:
+        return _extrair_teses_gemini(processo, doc, paginas, texto_md, prompt_texto, system_instruction)
+    except Exception as e:
+        _log.error("[TESES-EXTRACAO] Gemini falhou: %s — processo=%s%s", e, processo.id,
+                   " — tentando Anthropic" if prompt_texto else "")
+
+    # 2. Anthropic (fallback — só pela via textual do OCR; sem MD não há como cair aqui)
+    if prompt_texto:
+        try:
+            from pareceres.integrations.anthropic import AnthropicClient
+            texto = AnthropicClient().generate_text(
+                processo, prompt_texto, system_prompt=system_instruction,
+                max_tokens=2048, temperature=0.1, fase_label="Extração Tese F4 (fallback)",
+            )
+            _log.info("[TESES-EXTRACAO] Fallback Anthropic OK processo=%s", processo.id)
+            return (texto or "").strip()
+        except Exception as e:
+            _log.error("[TESES-EXTRACAO] Anthropic também falhou: %s — processo=%s", e, processo.id)
+
+    return None
+
+
 def execute_extracao(processo) -> ServiceResult:
     """
-    Extrai a tese defensiva do PDF consolidado via Gemini.
+    Extrai a tese defensiva do PDF consolidado via Gemini, com fallback Anthropic.
 
     Pré-condição: processo na fase TESE.
     Pós-condição: AnaliseTese criada com o título da tese.
-    Se nenhuma tese identificada, retorna com flag skip_to_parecer=True.
+    Se a extração ficar indisponível, degrada para "sem teses" (não trava o front).
     """
-    from pareceres.integrations.gemini import GeminiClient
     from pareceres.prompts.phase_4 import SYSTEM_INSTRUCTION_EXTRACT
 
     _log.info("[TESES-EXTRACAO] START processo=%s", processo.id)
-
-    gemini = GeminiClient()
 
     # Buscar documento consolidado (contém a defesa recursal)
     doc_consolidado = processo.documentos.filter(tipo="consolidado").first()
@@ -191,82 +281,42 @@ def execute_extracao(processo) -> ServiceResult:
     if not doc_consolidado:
         return ServiceResult.falha("Nenhum documento encontrado para extração de teses.")
 
-    # ── Tentar usar MD do OCR (salvo na Fase 2) ──────────────────────────
+    # Texto OCR (MD) da Fase 2 — habilita a via textual (Gemini e fallback Anthropic)
     paginas_defesa = processo.paginas_defesa or "todas"
     texto_md = _obter_md_defesa(doc_consolidado, paginas_defesa)
 
+    prompt_texto = None
     if texto_md:
-        # Usar texto MD estruturado — sem upload de PDF
-        _log.info("[TESES-EXTRACAO] Usando MD (%d chars) processo=%s", len(texto_md), processo.id)
-        prompt_user = (
+        prompt_texto = (
             "# DEFESA RECURSAL (OCR Markdown)\n\n"
             f"{texto_md}\n\n"
             "---\n\n"
             "Extraia TODAS as teses defensivas apresentadas pelo recorrente acima, "
             "cada uma separadamente, no formato exato: 'Tese N: [resumo]'."
         )
-        contents = [prompt_user]
-    else:
-        # Fallback: recortar páginas de defesa do PDF e fazer upload
-        _log.info("[TESES-EXTRACAO] Sem MD, usando PDF processo=%s", processo.id)
-        pdf_recortado = _extrair_paginas_defesa(doc_consolidado.arquivo.name, paginas_defesa)
 
-        if pdf_recortado:
-            uploaded = gemini.upload_file_from_path(pdf_recortado)
-            try:
-                os.unlink(pdf_recortado)
-            except Exception:
-                pass
-        else:
-            uploaded = gemini.upload_file(doc_consolidado.arquivo.name)
+    tese_extraida = _extrair_teses_llm(
+        processo, doc_consolidado, paginas_defesa, texto_md, prompt_texto,
+        SYSTEM_INSTRUCTION_EXTRACT,
+    )
 
-        if not uploaded:
-            return ServiceResult.falha("Não foi possível processar o documento para extração de teses.")
-
-        prompt_user = (
-            "O documento anexo contém EXCLUSIVAMENTE a defesa recursal do recorrente. "
-            "Extraia TODAS as teses defensivas apresentadas, cada uma separadamente, "
-            "no formato exato: 'Tese N: [resumo]'."
+    # Ambos os provedores caíram → degrada graciosamente (não deixa a task em
+    # retry nem o front girando): avança com placeholder para tratamento manual.
+    if tese_extraida is None:
+        _log.error("[TESES-EXTRACAO] Extração indisponível (Gemini+Anthropic) — processo=%s", processo.id)
+        return _marcar_sem_teses(
+            processo,
+            "Extração automática de teses indisponível no momento. "
+            "Verifique manualmente as teses da defesa.",
+            motivo_audit="Gemini e Anthropic indisponíveis",
         )
-        contents = [uploaded, prompt_user]
 
-    try:
-        import time as _time
-        t0 = _time.time()
-        response, model_used = gemini.generate(
-            model="gemini-2.5-flash",
-            contents=contents,
-            config={
-                "temperature": 0.1,
-                "max_output_tokens": 2048,
-                "system_instruction": SYSTEM_INSTRUCTION_EXTRACT,
-            },
-            timeout_per_call=90,
-        )
-        gemini.log_usage(processo, response, "Extração Tese F4", model_used, t0)
-        tese_extraida = (response.text or "").strip()
-    except Exception as e:
-        _log.error("[TESES-EXTRACAO] Erro Gemini: %s — processo=%s", e, processo.id)
-        return ServiceResult.falha(f"Erro ao extrair teses: {e}")
-
-    # Tese vazia → criar tese padrão e seguir para análise normal
-    # O julgador decide na tela de teses (não pular automaticamente)
+    # LLM respondeu, mas sem teses → placeholder e segue (julgador decide)
     if not tese_extraida:
-        _log.warning("[TESES-EXTRACAO] Nenhuma tese identificada — processo=%s", processo.id)
-        processo.teses.all().delete()
-        AnaliseTese.objects.create(
-            processo=processo,
-            ordem=1,
-            titulo="Nenhuma tese defensiva identificada na peça recursal.",
-        )
-        processo.avancar_fase(FaseProcesso.TESE_AGUARDANDO)
-        log_audit("fase", processo=processo, fase="teses_sem_extracao", dados={
-            "motivo": "Gemini não identificou teses no PDF",
-        })
-        _log.info("[TESES-EXTRACAO] OK (sem teses) processo=%s", processo.id)
-        return ServiceResult.sucesso(
-            "Nenhuma tese identificada. O julgador pode verificar manualmente.",
-            teses_count=0,
+        return _marcar_sem_teses(
+            processo,
+            "Nenhuma tese defensiva identificada na peça recursal.",
+            motivo_audit="LLM não identificou teses no PDF",
         )
 
     # Criar registros de tese
