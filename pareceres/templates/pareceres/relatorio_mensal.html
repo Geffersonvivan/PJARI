@@ -61,13 +61,21 @@
           <p class="text-[10px] font-semibold tracking-wide text-gray-400">{{ item.numero }}</p>
           <p class="text-sm font-bold text-gray-800">{{ item.cabecalho }}</p>
         </div>
-        {% if item.resultado == "DEFERIDO" %}
-        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">DEFERIDO</span>
-        {% elif item.resultado == "INDEFERIDO" %}
-        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">INDEFERIDO</span>
-        {% elif item.resultado == "NAO_CONHECIDO" %}
-        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">NÃO CONHECIDO</span>
-        {% endif %}
+        <div class="flex items-center gap-2">
+          <a href="{% url 'pareceres:processo_wizard' pk=item.processo.pk %}?passo=5"
+             class="btn-editar inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition"
+             style="text-decoration:none;">
+            <i class="ph ph-pencil-simple" style="font-size:14px;"></i>
+            Editar
+          </a>
+          {% if item.resultado == "DEFERIDO" %}
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">DEFERIDO</span>
+          {% elif item.resultado == "INDEFERIDO" %}
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">INDEFERIDO</span>
+          {% elif item.resultado == "NAO_CONHECIDO" %}
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">NÃO CONHECIDO</span>
+          {% endif %}
+        </div>
       </div>
       <!-- Síntese (parágrafo único) -->
       <p class="text-xs text-gray-600 leading-relaxed mt-2">{{ item.sintese }}</p>
@@ -84,7 +92,7 @@
 
 <style>
   @media print {
-    nav, #folders-bar, button, a[href*="home"] { display: none !important; }
+    nav, #folders-bar, button, a[href*="home"], .btn-editar { display: none !important; }
     .shadow-sm { box-shadow: none !important; }
     body { background: white !important; }
   }
