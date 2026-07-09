@@ -47,10 +47,10 @@ class PerplexityClient:
         Retorna texto com fundamentação encontrada.
         """
         if not self.api_key:
-            return (
-                "Simulação (Perplexity): Tese pesquisada. "
-                "A tese é favorável segundo jurisprudência recente (REsp 123.456)."
-            )
+            # NUNCA fabricar jurisprudência (REsp/acórdão) — "inferência proibida".
+            # Retorna marcador honesto de indisponibilidade.
+            _log.warning("[PERPLEXITY] Sem API key — pesquisa jurisprudencial não realizada")
+            return "Pesquisa jurisprudencial indisponível (serviço não configurado)."
 
         # Cache
         key = _cache_key(tese)
@@ -120,5 +120,6 @@ class PerplexityClient:
 
             return resultado
         except Exception as e:
+            # Não vazar a mensagem de exceção como se fosse fundamentação jurídica.
             _log.error("Erro Perplexity: %s", e)
-            return f"Erro ao acessar Perplexity: {e}"
+            return "Pesquisa jurisprudencial indisponível (erro na consulta)."
