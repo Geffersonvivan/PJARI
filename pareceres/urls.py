@@ -1,7 +1,11 @@
 from django.urls import path
 from . import views
 from .views_pdf import exportar_parecer_pdf
-from .views_relatorio import relatorio_mensal, relatorio_mensal_pdf
+from .views_relatorio import (
+    api_relatorio_sintese_editar,
+    relatorio_mensal,
+    relatorio_mensal_pdf,
+)
 from .views_stats import estatisticas_view, estatisticas_gerais_view
 
 app_name = "pareceres"
@@ -88,6 +92,8 @@ urlpatterns = [
     # Relatório Mensal
     path("relatorio/<int:pasta_id>/", relatorio_mensal, name="relatorio_mensal"),
     path("relatorio/<int:pasta_id>/pdf/", relatorio_mensal_pdf, name="relatorio_mensal_pdf"),
+    path("api/processo/<int:pk>/relatorio-sintese/", api_relatorio_sintese_editar,
+         name="api_relatorio_sintese_editar"),
 
     # Estatísticas
     path("estatisticas/", estatisticas_view, name="estatisticas"),

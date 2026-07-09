@@ -5,16 +5,18 @@ Consolida todos os processos finalizados de uma pasta mensal
 e gera relatório padronizado com 3 linhas por processo.
 """
 
+import json
 import logging
 from datetime import date
 
 from django.contrib.auth.decorators import login_required
-from django.http import Http404, HttpResponse
-from django.shortcuts import render
+from django.http import Http404, HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, render
 from django.template.loader import render_to_string
 from django.utils.text import get_text_list
+from django.views.decorators.http import require_POST
 
-from .models import Pasta
+from .models import Pasta, Processo
 
 _log = logging.getLogger(__name__)
 
@@ -88,6 +90,12 @@ def _montar_item(processo):
             frase += f", em razão de {motivos}"
         sintese += frase + "."
 
+    # Override manual da síntese (editado inline no relatório) prevalece.
+    sintese_editada = (processo.relatorio_sintese_editada or "").strip()
+    editado = bool(sintese_editada)
+    if editado:
+        sintese = sintese_editada
+
     # ── Votos (conhecimento + mérito) ───────────────────────────────────────
     if resultado == "NAO_CONHECIDO":
         voto_principal = "Voto pelo não conhecimento."
@@ -104,6 +112,7 @@ def _montar_item(processo):
         "numero": numero,
         "cabecalho": cabecalho,
         "sintese": sintese,
+        "editado": editado,
         "voto_principal": voto_principal,
         "voto_subsidiario": voto_subsidiario,
         "resultado": resultado,
@@ -173,3 +182,22 @@ def relatorio_mensal_pdf(request, pasta_id):
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
+
+
+@login_required
+@require_POST
+def api_relatorio_sintese_editar(request, pk):
+    """Salva (ou limpa) o override manual da síntese do relatório do processo.
+
+    texto vazio → remove o override e o relatório volta a gerar a síntese
+    automática. Retorna {ok, editado}.
+    """
+    processo = get_object_or_404(Processo, pk=pk, user=request.user)
+    try:
+        body = json.loads(request.body) if request.body else {}
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+    texto = (body.get("sintese") or "").strip()
+    processo.relatorio_sintese_editada = texto
+    processo.save(update_fields=["relatorio_sintese_editada"])
+    return JsonResponse({"ok": True, "editado": bool(texto)})

@@ -54,7 +54,8 @@
   <!-- Itens do relatório -->
   <div class="space-y-3">
     {% for item in itens %}
-    <div class="bg-white rounded-xl border border-gray-100 shadow-sm px-6 py-4 hover:border-gray-200 transition">
+    <div class="bg-white rounded-xl border border-gray-100 shadow-sm px-6 py-4 hover:border-gray-200 transition"
+         data-item data-url-sintese="{% url 'pareceres:api_relatorio_sintese_editar' pk=item.processo.pk %}">
       <!-- Cabeçalho: PARECER: NOME / RESULTADO -->
       <div class="flex items-start justify-between mb-1">
         <div>
@@ -62,12 +63,14 @@
           <p class="text-sm font-bold text-gray-800">{{ item.cabecalho }}</p>
         </div>
         <div class="flex items-center gap-2">
-          <a href="{% url 'pareceres:processo_wizard' pk=item.processo.pk %}"
-             class="btn-editar inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition"
-             style="text-decoration:none;">
+          <span class="marker-editado inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 {% if not item.editado %}hidden{% endif %}">
+            <i class="ph ph-pencil-line" style="font-size:12px;"></i> Texto editado
+          </span>
+          <button type="button"
+             class="btn-editar inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition">
             <i class="ph ph-pencil-simple" style="font-size:14px;"></i>
             Editar
-          </a>
+          </button>
           {% if item.resultado == "DEFERIDO" %}
           <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">DEFERIDO</span>
           {% elif item.resultado == "INDEFERIDO" %}
@@ -77,8 +80,16 @@
           {% endif %}
         </div>
       </div>
-      <!-- Síntese (parágrafo único) -->
-      <p class="text-xs text-gray-600 leading-relaxed mt-2">{{ item.sintese }}</p>
+      <!-- Síntese: modo leitura -->
+      <p class="sintese-view text-xs text-gray-600 leading-relaxed mt-2">{{ item.sintese }}</p>
+      <!-- Síntese: modo edição (oculto) -->
+      <div class="sintese-edit hidden mt-2">
+        <textarea class="sintese-input w-full border border-gray-300 rounded-lg p-2 text-xs text-gray-700 leading-relaxed focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" rows="4">{{ item.sintese }}</textarea>
+        <div class="flex items-center gap-2 mt-2">
+          <button type="button" class="btn-salvar-sintese px-3 py-1 text-xs font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition">Salvar</button>
+          <button type="button" class="btn-cancelar-sintese px-3 py-1 text-xs font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition">Cancelar</button>
+        </div>
+      </div>
       <!-- Votos -->
       <div class="text-xs text-gray-700 leading-relaxed mt-2">
         <p class="font-semibold">{{ item.voto_principal }}</p>
@@ -92,9 +103,67 @@
 
 <style>
   @media print {
-    nav, #folders-bar, button, a[href*="home"], .btn-editar { display: none !important; }
+    nav, #folders-bar, button, a[href*="home"], .btn-editar,
+    .sintese-edit, .marker-editado { display: none !important; }
     .shadow-sm { box-shadow: none !important; }
     body { background: white !important; }
   }
 </style>
+
+<script>
+(function () {
+  function getCookie(name) {
+    var m = document.cookie.match("(^|;)\\s*" + name + "\\s*=\\s*([^;]+)");
+    return m ? m.pop() : "";
+  }
+  var csrftoken = getCookie("csrftoken");
+
+  document.querySelectorAll("[data-item]").forEach(function (card) {
+    var btnEditar = card.querySelector(".btn-editar");
+    var view = card.querySelector(".sintese-view");
+    var edit = card.querySelector(".sintese-edit");
+    var input = card.querySelector(".sintese-input");
+    var btnSalvar = card.querySelector(".btn-salvar-sintese");
+    var btnCancelar = card.querySelector(".btn-cancelar-sintese");
+    var marker = card.querySelector(".marker-editado");
+    var url = card.getAttribute("data-url-sintese");
+
+    function abrir() {
+      input.value = view.textContent.trim();
+      view.classList.add("hidden");
+      edit.classList.remove("hidden");
+      btnEditar.classList.add("hidden");
+      input.focus();
+    }
+    function fechar() {
+      edit.classList.add("hidden");
+      view.classList.remove("hidden");
+      btnEditar.classList.remove("hidden");
+    }
+
+    btnEditar.addEventListener("click", abrir);
+    btnCancelar.addEventListener("click", fechar);
+    btnSalvar.addEventListener("click", function () {
+      var texto = input.value.trim();
+      btnSalvar.disabled = true;
+      fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
+        body: JSON.stringify({ sintese: texto }),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          btnSalvar.disabled = false;
+          if (!data.ok) { alert(data.error || "Erro ao salvar."); return; }
+          // Texto limpo → override removido → recarrega p/ mostrar o gerado.
+          if (!data.editado) { window.location.reload(); return; }
+          view.textContent = texto;
+          marker.classList.remove("hidden");
+          fechar();
+        })
+        .catch(function () { btnSalvar.disabled = false; alert("Erro de conexão."); });
+    });
+  });
+})();
+</script>
 {% endblock %}

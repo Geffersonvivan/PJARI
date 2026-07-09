@@ -81,6 +81,10 @@ class Processo(models.Model):
         db_index=True,
     )
 
+    # Override manual da síntese exibida no relatório mensal. Se preenchido,
+    # prevalece sobre o texto gerado automaticamente pelo _montar_item.
+    relatorio_sintese_editada = models.TextField(blank=True, default="")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
