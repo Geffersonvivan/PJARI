@@ -18,6 +18,14 @@ from django.core.files.storage import default_storage
 # Limite do Document AI por requisição (online processing, modo padrão)
 _BATCH_SIZE = 15
 
+# Uma página é considerada "texto nativo" se o PyMuPDF extrai ao menos este número
+# de caracteres — evita o OCR (gargalo por página) em PDFs digitais. Páginas
+# escaneadas (imagem pura) retornam ~0 chars e continuam indo para o Document AI.
+_MIN_CHARS_PAGINA = 50
+
+# Máximo de lotes de OCR processados em paralelo (I/O de rede). Configurável.
+_DOCAI_MAX_PARALLEL = int(os.environ.get("DOCAI_MAX_PARALLEL", "6"))
+
 _log = logging.getLogger(__name__)
 
 
@@ -121,6 +129,7 @@ class DocumentAIClient:
             return None
 
         try:
+            import concurrent.futures
             import fitz  # PyMuPDF
             from google.cloud import documentai_v1 as documentai
 
@@ -129,86 +138,124 @@ class DocumentAIClient:
             doc = fitz.open(stream=pdf_bytes, filetype="pdf")
             total_pages = len(doc)
 
+            # ── Passo A: classificar cada página — texto nativo vs. precisa OCR ──
+            # Páginas com camada de texto (PDFs digitais) são exatas e de graça;
+            # só as escaneadas (imagem) vão para o Document AI. Preserva 100% do
+            # conteúdo — nada de perder página escaneada num PDF misto.
+            paginas_finais = [None] * total_pages   # dict por índice de página
+            faltantes = []                          # índices que precisam de OCR
+            for i, page in enumerate(doc):
+                texto = page.get_text("text") or ""
+                if len(texto.strip()) >= _MIN_CHARS_PAGINA:
+                    paginas_finais[i] = {"numero": i + 1, "texto": texto, "confianca": 1.0}
+                else:
+                    faltantes.append(i)
+
+            # ── Atalho: PDF 100% nativo → nenhum OCR ────────────────────────
+            if not faltantes:
+                doc.close()
+                latency_ms = int((time.time() - start) * 1000)
+                _log.info("[DOCAI] PDF 100%% texto nativo: %d páginas — OCR PULADO, "
+                          "latency=%dms, path=%s", total_pages, latency_ms, label)
+                return {
+                    "texto_completo": "\n".join(p["texto"] for p in paginas_finais),
+                    "paginas": paginas_finais,
+                    "confianca_media": 1.0,
+                    "total_paginas": total_pages,
+                    "latency_ms": latency_ms,
+                }
+
             resource_name = self.client.processor_path(
                 self.project_id, self.location, self.processor_id
             )
 
-            # Dividir em lotes de _BATCH_SIZE páginas
-            all_paginas = []
-            all_textos = []
-            all_confiancas = []
-
-            for batch_start in range(0, total_pages, _BATCH_SIZE):
-                batch_end = min(batch_start + _BATCH_SIZE, total_pages)
-                _log.info("[DOCAI] Processando lote páginas %d-%d de %d — path=%s",
-                          batch_start + 1, batch_end, total_pages, label)
-
-                # Extrair lote como PDF separado
+            # ── Passo B: pré-fatiar SÓ as páginas faltantes em lotes ────────
+            # (PyMuPDF não é thread-safe p/ acesso concorrente ao mesmo doc, então
+            #  o fatiamento é sequencial; o paralelismo fica só nas chamadas de rede.)
+            lotes = []  # (indices_originais, batch_bytes)
+            for k in range(0, len(faltantes), _BATCH_SIZE):
+                chunk = faltantes[k:k + _BATCH_SIZE]
                 batch_doc = fitz.open()
-                batch_doc.insert_pdf(doc, from_page=batch_start, to_page=batch_end - 1)
-                batch_bytes = batch_doc.tobytes()
+                for pno in chunk:
+                    batch_doc.insert_pdf(doc, from_page=pno, to_page=pno)
+                lotes.append((chunk, batch_doc.tobytes()))
                 batch_doc.close()
+            doc.close()
 
+            def _process_lote(chunk, batch_bytes):
                 request = documentai.ProcessRequest(
                     name=resource_name,
                     raw_document=documentai.RawDocument(
-                        content=batch_bytes,
-                        mime_type="application/pdf",
+                        content=batch_bytes, mime_type="application/pdf",
                     ),
                     process_options=documentai.ProcessOptions(
                         ocr_config=documentai.OcrConfig(
                             enable_native_pdf_parsing=True,
-                            hints=documentai.OcrConfig.Hints(
-                                language_hints=["pt"],
-                            ),
+                            hints=documentai.OcrConfig.Hints(language_hints=["pt"]),
                         ),
                     ),
                 )
+                return chunk, self.client.process_document(request=request).document
 
-                result = self.client.process_document(request=request)
-                batch_document = result.document
+            # ── Passo C: processar os lotes EM PARALELO (I/O de rede) ───────
+            workers = max(1, min(len(lotes), _DOCAI_MAX_PARALLEL))
+            resultados = []
+            if workers == 1:
+                for chunk, bb in lotes:
+                    resultados.append(_process_lote(chunk, bb))
+            else:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+                    futs = [ex.submit(_process_lote, chunk, bb) for chunk, bb in lotes]
+                    for fut in futs:
+                        resultados.append(fut.result())
 
-                all_textos.append(batch_document.text or "")
-
-                for i, page in enumerate(batch_document.pages):
+            # ── Passo D: mapear cada página OCR de volta ao índice original ──
+            ocr_confs = []
+            for chunk, batch_document in resultados:
+                for j, page in enumerate(batch_document.pages):
+                    if j >= len(chunk):
+                        break
+                    orig_i = chunk[j]
                     page_text = self._extrair_texto_pagina(batch_document.text, page)
-
-                    block_confidences = []
-                    for block in page.blocks:
-                        if block.layout.confidence:
-                            block_confidences.append(block.layout.confidence)
-
+                    block_confidences = [
+                        b.layout.confidence for b in page.blocks if b.layout.confidence
+                    ]
                     page_conf = (
                         sum(block_confidences) / len(block_confidences)
                         if block_confidences else 0.0
                     )
-                    all_confiancas.append(page_conf)
-
-                    all_paginas.append({
-                        "numero": batch_start + i + 1,
+                    ocr_confs.append(page_conf)
+                    paginas_finais[orig_i] = {
+                        "numero": orig_i + 1,
                         "texto": page_text,
                         "confianca": round(page_conf, 3),
-                    })
+                    }
 
-            doc.close()
+            # Fallback defensivo: se alguma página não voltou, mantém vazia
+            paginas_finais = [
+                p or {"numero": i + 1, "texto": "", "confianca": 0.0}
+                for i, p in enumerate(paginas_finais)
+            ]
+
             latency_ms = int((time.time() - start) * 1000)
-
             confianca_media = (
-                sum(all_confiancas) / len(all_confiancas) if all_confiancas else 0.0
+                sum(p["confianca"] for p in paginas_finais) / total_pages
+                if total_pages else 0.0
             )
 
             resultado = {
-                "texto_completo": "\n".join(all_textos),
-                "paginas": all_paginas,
+                "texto_completo": "\n".join(p["texto"] for p in paginas_finais),
+                "paginas": paginas_finais,
                 "confianca_media": round(confianca_media, 3),
-                "total_paginas": len(all_paginas),
+                "total_paginas": total_pages,
                 "latency_ms": latency_ms,
             }
 
             _log.info(
-                "[DOCAI] OCR OK: %d páginas (%d lotes), confiança=%.1f%%, latency=%dms, path=%s",
-                len(all_paginas), -(-total_pages // _BATCH_SIZE),
-                confianca_media * 100, latency_ms, label,
+                "[DOCAI] OCR OK: %d páginas (%d nativas, %d via OCR em %d lote(s)/%d paralelo), "
+                "confiança=%.1f%%, latency=%dms, path=%s",
+                total_pages, total_pages - len(faltantes), len(faltantes),
+                len(lotes), workers, confianca_media * 100, latency_ms, label,
             )
 
             return resultado
