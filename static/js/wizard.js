@@ -185,7 +185,7 @@
   function pollTask(taskId, onDone, loadingId) {
     const url = urls.taskStatus.replace("__TASK__", taskId);
     const startTime = Date.now();
-    const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos
+    const TIMEOUT_MS = 9 * 60 * 1000; // 9 min — DEVE ser > time_limit da task Celery (480s), senão mostra "timeout" com task ainda viva
     const poll = () => {
       if (Date.now() - startTime > TIMEOUT_MS) {
         if (loadingId) hideLoading(loadingId);
@@ -212,7 +212,7 @@
 
   function pollFase(faseEsperada, onDone, loadingId) {
     var startTime = Date.now();
-    var TIMEOUT_MS = 5 * 60 * 1000;
+    var TIMEOUT_MS = 9 * 60 * 1000; // 9 min — alinhado com o time_limit das tasks Celery
     function check() {
       if (Date.now() - startTime > TIMEOUT_MS) {
         if (loadingId) hideLoading(loadingId);

@@ -10,6 +10,7 @@ Pipeline de extração (4 camadas de assertividade):
 4. Confidence score salvo por campo → UI mostra verde/amarelo/vermelho
 """
 
+import concurrent.futures
 import datetime
 import logging
 import re
@@ -20,6 +21,20 @@ from pareceres.models import Admissibilidade, log_audit
 from . import ServiceResult
 
 _log = logging.getLogger(__name__)
+
+
+def _run_in_thread(fn, *args, **kwargs):
+    """Executa `fn` numa thread worker e fecha as conexões de BD que ela abriu.
+
+    As conexões do Django são thread-local: cada thread do executor abre as
+    suas próprias (via log_usage/log_audit dentro dos _tentar_*) e precisa
+    fechá-las ao terminar, senão vazam.
+    """
+    from django.db import connections
+    try:
+        return fn(*args, **kwargs)
+    finally:
+        connections.close_all()
 
 # ── Prompt de extração ──────────────────────────────────────────────────────
 
@@ -477,12 +492,27 @@ def execute(processo) -> ServiceResult:
         texto_ocr = ocr_resultado["texto_completo"]
         _log.info("[DOCUMENTOS] OCR texto bruto (sem páginas): %d chars", len(texto_ocr))
 
-    # ── Camada 1: Extração Gemini ───────────────────────────────────────
-    texto_gemini = _tentar_gemini(processo, docs_dict, texto_ocr=texto_ocr)
-    resultado_gemini = _parse_resposta_llm(texto_gemini) if texto_gemini else None
+    # ── Camadas 1+2: Extração Gemini + Claude EM PARALELO ───────────────
+    # Ambos consomem o mesmo texto_ocr e são independentes → rodam em threads
+    # separadas para cortar ~metade do tempo de LLM. Timeout por chamada evita
+    # que uma API pendurada trave o pipeline inteiro até o time_limit da task.
+    texto_gemini = texto_claude = None
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+    try:
+        f_gemini = executor.submit(_run_in_thread, _tentar_gemini, processo, docs_dict, texto_ocr)
+        f_claude = executor.submit(_run_in_thread, _tentar_anthropic, processo, docs_dict, texto_ocr)
+        try:
+            texto_gemini = f_gemini.result(timeout=180)
+        except Exception as e:
+            _log.error("[DOCUMENTOS] Gemini timeout/erro em paralelo: %s", e)
+        try:
+            texto_claude = f_claude.result(timeout=180)
+        except Exception as e:
+            _log.error("[DOCUMENTOS] Anthropic timeout/erro em paralelo: %s", e)
+    finally:
+        executor.shutdown(wait=False)
 
-    # ── Camada 2: Extração Claude (para consenso ou fallback) ───────────
-    texto_claude = _tentar_anthropic(processo, docs_dict, texto_ocr=texto_ocr)
+    resultado_gemini = _parse_resposta_llm(texto_gemini) if texto_gemini else None
     resultado_claude = _parse_resposta_llm(texto_claude) if texto_claude else None
 
     # ── Camada 3: Consenso ou fallback ──────────────────────────────────

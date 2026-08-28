@@ -151,12 +151,14 @@ def api_fase_atual(request, pk):
     """Retorna estado atual do processo (para polling do frontend)."""
     processo = get_object_or_404(Processo, pk=pk, user=request.user)
 
-    # Auto-recovery: se processo ficou travado em fase intermediária sem worker
+    # Auto-recovery: só avança se a task REALMENTE morreu (worker caiu ou estourou
+    # o time_limit de 480s). Um limiar curto (ex. 30s) disparava no meio de extrações
+    # saudáveis — que levam minutos — marcando como "concluído" com dados vazios.
     if processo.fase == FaseProcesso.DOCUMENTOS_EXTRAINDO:
         import datetime as _dt
         from django.utils import timezone
-        if processo.updated_at < timezone.now() - _dt.timedelta(seconds=30):
-            _log.info("[RECOVERY] Processo %s travado em DOCUMENTOS_EXTRAINDO — avançando", pk)
+        if processo.updated_at < timezone.now() - _dt.timedelta(seconds=540):
+            _log.info("[RECOVERY] Processo %s travado em DOCUMENTOS_EXTRAINDO há >540s — avançando", pk)
             processo.fase = FaseProcesso.DOCUMENTOS_EXTRAIDOS
             processo.save(update_fields=["fase"])
 

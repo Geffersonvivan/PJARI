@@ -30,10 +30,16 @@ def _handle_result(result, task_self, processo_id):
     return {"erro": result.erro}
 
 
-@shared_task(bind=True, time_limit=480, max_retries=3,
-             default_retry_delay=30, acks_late=True)
+@shared_task(bind=True, time_limit=480, soft_time_limit=450, max_retries=1,
+             default_retry_delay=30, acks_late=False)
 def extrair_documentos_task(self, processo_id):
-    """Fase 2: Extrai dados dos PDFs via Gemini Files API."""
+    """Fase 2: Extrai dados dos PDFs via Gemini Files API.
+
+    Pipeline pesado e NÃO idempotente (OCR + 2 LLMs). Por isso:
+    - acks_late=False: se a task for morta no time_limit, NÃO é reentregue — evita
+      reexecutar o pipeline inteiro do zero (tempestade que travava a UI).
+    - max_retries=1: no máximo uma nova tentativa para erro transitório real.
+    """
     from pareceres.services.service_documentos import execute
 
     try:
