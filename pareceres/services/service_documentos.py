@@ -568,8 +568,16 @@ def execute(processo) -> ServiceResult:
         doc_consolidado.extracao_json = extracao_json
         doc_consolidado.save(update_fields=["extracao_json"])
 
-    # Avançar fase
-    processo.avancar_fase(FaseProcesso.DOCUMENTOS_EXTRAIDOS)
+    # Avançar fase — idempotente. Reprocessamento (upload duplicado) ou o
+    # auto-recovery podem já ter deixado o processo em EXTRAIDOS (ou além). Os
+    # campos já foram salvos acima; só avançamos se a transição for válida,
+    # evitando um ValueError que marcaria a task como FAILURE (erro falso na UI).
+    validas = FaseProcesso.transicoes_validas().get(processo.fase, [])
+    if FaseProcesso.DOCUMENTOS_EXTRAIDOS in validas:
+        processo.avancar_fase(FaseProcesso.DOCUMENTOS_EXTRAIDOS)
+    else:
+        _log.info("[DOCUMENTOS] processo=%s já em fase=%s — extração salva sem re-avançar",
+                  processo.id, processo.fase)
 
     log_audit("fase", processo=processo, fase="documentos_extraidos",
               dados={"provider": provider, "docs_processados": list(docs_dict.keys()),
