@@ -14,12 +14,13 @@ python3 manage.py migrate --noinput
 echo "Collecting static files..."
 python3 manage.py collectstatic --noinput 2>/dev/null || true
 
-# Migração one-time do volume /app/media → GCS (guardada por flag).
+# Migração one-time do volume /app/media → R2 (guardada por flag).
 # Ative MIGRATE_MEDIA=1 num deploy, confira o log "Concluído", depois remova a
-# flag. Idempotente: pula o que já existe no bucket.
+# flag. Idempotente: pula o que já existe no bucket. (GCS descontinuado: billing
+# do projeto fechado — ver migrate_media_to_r2.)
 if [ "$MIGRATE_MEDIA" = "1" ]; then
-  echo "MIGRATE_MEDIA=1 → copiando mídia local para o GCS..."
-  python3 manage.py migrate_media_to_gcs || echo "AVISO: migrate_media_to_gcs falhou (ver logs acima)"
+  echo "MIGRATE_MEDIA=1 → copiando mídia local para o R2..."
+  python3 manage.py migrate_media_to_r2 || echo "AVISO: migrate_media_to_r2 falhou (ver logs acima)"
 fi
 
 # Celery workers em background (compartilham volume /app/media)
