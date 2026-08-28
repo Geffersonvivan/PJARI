@@ -30,7 +30,10 @@ whitenoise>=6.7
 # google-generativeai NÃO fornece esses símbolos — usá-lo quebra em produção
 # com ImportError: cannot import name 'genai' from 'google'.
 google-genai>=2.0,<3
-anthropic>=0.34
+# PIN EXATO: `>=0.34` deixava o build de prod resolver uma versão cujo
+# messages.create() rejeita `temperature` (TypeError em F3/F5 → parecer caía
+# sempre no fallback). 0.103.1 é a versão validada localmente e nos testes.
+anthropic==0.103.1
 
 # RAG — busca vetorial local (substitui Vertex AI / Discovery Engine)
 pgvector>=0.3
