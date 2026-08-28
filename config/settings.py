@@ -136,30 +136,10 @@ STORAGES = {
     },
 }
 
-# ── Storage de uploads em produção ──────────────────────────────────────────
-# Precedência: R2 (Cloudflare, S3-compatível) > GCS (legado, billing fechado) >
-# filesystem local (volume Railway, não compartilhável entre serviços).
-USE_R2 = os.environ.get("USE_R2", "False") == "True"
+# GCS para uploads em produção
 USE_GCS = os.environ.get("USE_GCS", "False") == "True"
 
-if USE_R2:
-    STORAGES["default"] = {
-        "BACKEND": "storages.backends.s3.S3Storage",
-        "OPTIONS": {
-            "bucket_name": os.environ.get("R2_BUCKET_NAME", "pjari-midias"),
-            "access_key": os.environ.get("R2_ACCESS_KEY_ID"),
-            "secret_key": os.environ.get("R2_SECRET_ACCESS_KEY"),
-            "endpoint_url": os.environ.get("R2_ENDPOINT_URL"),
-            "region_name": "auto",
-            "signature_version": "s3v4",
-            "addressing_style": "virtual",
-            "default_acl": None,          # R2 não suporta ACLs
-            "querystring_auth": True,     # URLs assinadas (bucket privado)
-            "querystring_expire": 86400,  # 24h
-            "file_overwrite": False,
-        },
-    }
-elif USE_GCS:
+if USE_GCS:
     STORAGES["default"] = {
         "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
         "OPTIONS": {
