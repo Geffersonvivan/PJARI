@@ -91,6 +91,34 @@ def processo_novo(request):
 def processo_wizard(request, pk):
     """View principal do wizard — renderiza o stepper."""
     processo = _get_processo_or_404(request, pk)
+
+    # ── Auto-recovery do PARECER ────────────────────────────────────────────
+    # A geração roda na fila heavy; se o worker morre (ex.: restart de deploy),
+    # a task não-ackada só é reentregue após o visibility_timeout do Redis (~1h)
+    # e o front fica preso em "Gerando parecer...". Enquanto os workers rodam no
+    # mesmo container do web (ver separação futura), um reload aqui recupera:
+    #   - Se o Parecer já foi criado (task morreu no fim) → avança p/ AUDITORIA.
+    #   - Senão, se está parado há > limiar → re-dispara a task (get_or_create no
+    #     service torna o re-disparo idempotente).
+    if processo.fase in (FaseProcesso.PARECER, FaseProcesso.PARECER_GERANDO):
+        import datetime as _dt
+        from django.utils import timezone
+        tem_parecer = Parecer.objects.filter(
+            processo=processo, texto_ia__isnull=False
+        ).exclude(texto_ia="").exists()
+        if tem_parecer:
+            processo.fase = FaseProcesso.AUDITORIA
+            processo.save(update_fields=["fase"])
+            _log.info("[RECOVERY] Processo %s tinha Parecer mas fase presa — avançado p/ AUDITORIA", pk)
+        elif processo.updated_at < timezone.now() - _dt.timedelta(seconds=180):
+            _log.info("[RECOVERY] Processo %s preso em %s há >180s — re-disparando parecer",
+                      pk, processo.fase)
+            try:
+                from .tasks import gerar_parecer_task
+                gerar_parecer_task.delay(processo.id)
+            except Exception as e:
+                _log.error("[RECOVERY] Falha ao re-disparar parecer processo=%s: %s", pk, e)
+
     passo_atual = FaseProcesso.passo_wizard(processo.fase)
 
     docs = {
