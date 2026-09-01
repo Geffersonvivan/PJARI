@@ -182,11 +182,36 @@
     if (el) el.classList.add("hidden");
   }
 
-  function pollTask(taskId, onDone, loadingId) {
+  function pollTask(taskId, onDone, loadingId, faseFallback) {
     const url = urls.taskStatus.replace("__TASK__", taskId);
     const startTime = Date.now();
     const TIMEOUT_MS = 9 * 60 * 1000; // 9 min — DEVE ser > time_limit da task Celery (480s), senão mostra "timeout" com task ainda viva
+    // Fallback por fase: alguns result backends do Celery não persistem
+    // SUCCESS/FAILURE e o AsyncResult fica "PENDING" para sempre — a UI travava
+    // no spinner (ex.: extração parada em "FINALIZANDO EXTRACAO..."). Quando
+    // habilitado, também observamos a fase do processo: se ela avançou (ou o
+    // auto-recovery do servidor destravou), recarregamos. Só use em fluxos cujo
+    // término é uma mudança de fase (não nos encadeados que aguardam via pollFase).
+    const startPasso = currentPasso;
+    let done = false;
+    function finish(fn) { if (done) return; done = true; fn(); }
+
+    const checkFase = () => {
+      if (done || !faseFallback || !urls.fase) return;
+      api(urls.fase)
+        .then((d) => {
+          if (done || !d) return;
+          var avancou = typeof d.passo === "number" && d.passo > startPasso;
+          var aguardando = d.fase && d.fase.indexOf("aguardando") !== -1;
+          if (avancou || aguardando) {
+            finish(() => { if (loadingId) hideLoading(loadingId); transitionReload(); });
+          }
+        })
+        .catch(() => {});
+    };
+
     const poll = () => {
+      if (done) return;
       if (Date.now() - startTime > TIMEOUT_MS) {
         if (loadingId) hideLoading(loadingId);
         alert("Tempo limite excedido. Recarregue a página e tente novamente.");
@@ -194,14 +219,17 @@
       }
       api(url)
         .then((data) => {
+          if (done) return;
           if (data.status === "SUCCESS") {
-            if (loadingId) hideLoading(loadingId);
-            onDone(data.result);
+            finish(() => { if (loadingId) hideLoading(loadingId); onDone(data.result); });
           } else if (data.status === "FAILURE") {
-            if (loadingId) hideLoading(loadingId);
-            var msg = (data.result && data.result.erro) ? data.result.erro : "Erro no processamento. Tente novamente.";
-            alert(msg);
+            finish(() => {
+              if (loadingId) hideLoading(loadingId);
+              var msg = (data.result && data.result.erro) ? data.result.erro : "Erro no processamento. Tente novamente.";
+              alert(msg);
+            });
           } else {
+            checkFase();
             setTimeout(poll, 3000);
           }
         })
@@ -316,7 +344,7 @@
             pollTask(data.task_id, () => {
               clearInterval(progressInterval);
               transitionReload();
-            });
+            }, null, true);
           } else {
             alert(data.error || "Erro no upload.");
             transitionReload();
@@ -554,7 +582,7 @@
               return;
             }
             if (data.ok && data.task_id && data.task_id !== "sync") {
-              pollTask(data.task_id, function() { transitionReload(); }, "dados-loading");
+              pollTask(data.task_id, function() { transitionReload(); }, "dados-loading", true);
             } else if (data.ok) {
               setTimeout(function() { transitionReload(); }, 500);
             } else {
@@ -808,7 +836,7 @@
             if (!data.task_id || data.task_id === "sync") {
               setTimeout(function() { transitionReload(); }, 500);
             } else {
-              pollTask(data.task_id, function() { transitionReload(); }, "adm-loading");
+              pollTask(data.task_id, function() { transitionReload(); }, "adm-loading", true);
             }
           } else {
             hideLoading("adm-loading");
@@ -851,7 +879,7 @@
 
             if (data.skip_teses) {
               document.querySelector("#adm-loading .text-gray-600").textContent = "Gerando parecer (merito prejudicado)...";
-              pollTask(data.task_id, function() { transitionReload(); }, "adm-loading");
+              pollTask(data.task_id, function() { transitionReload(); }, "adm-loading", true);
             } else {
               document.querySelector("#adm-loading .text-gray-600").textContent = "Extraindo teses...";
               pollTask(data.task_id, function(result) {
@@ -984,7 +1012,7 @@
                 setTimeout(function() { transitionReload(); }, 500);
                 return;
               }
-              pollTask(data.task_id, function() { transitionReload(); }, "tese-loading");
+              pollTask(data.task_id, function() { transitionReload(); }, "tese-loading", true);
             } else {
               hideLoading("tese-loading");
               alert(data.error || "Erro ao confirmar teses.");

@@ -340,6 +340,20 @@ def _salvar_campos(processo, adm, resultado: dict):
 # ── OCR → Markdown ───────────────────────────────────────────────────────────
 
 
+# Caracteres de controle C0 (exceto \t \n \r) + NUL. PostgreSQL rejeita NUL
+# em colunas text/jsonb ("unsupported Unicode escape sequence"), então o OCR
+# precisa ser limpo ANTES de virar extracao_json — senão o .save() estoura e a
+# extração trava a UI em "FINALIZANDO EXTRACAO...".
+_CTRL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
+def _limpar_texto(texto: str) -> str:
+    """Remove NUL e caracteres de controle que o Postgres não aceita."""
+    if not texto:
+        return texto
+    return _CTRL_CHARS_RE.sub("", texto)
+
+
 def _ocr_para_markdown(ocr_resultado: dict) -> str:
     """
     Converte resultado do Document AI OCR em Markdown estruturado.
@@ -348,7 +362,7 @@ def _ocr_para_markdown(ocr_resultado: dict) -> str:
     partes = []
     for pagina in ocr_resultado.get("paginas", []):
         num = pagina.get("numero", "?")
-        texto = pagina.get("texto", "").strip()
+        texto = _limpar_texto(pagina.get("texto", "")).strip()
         if texto:
             partes.append(f"## Página {num}\n\n{texto}")
 
@@ -489,7 +503,7 @@ def execute(processo) -> ServiceResult:
                   ocr_resultado["total_paginas"], len(texto_ocr),
                   ocr_resultado["confianca_media"] * 100)
     elif ocr_resultado and ocr_resultado.get("texto_completo"):
-        texto_ocr = ocr_resultado["texto_completo"]
+        texto_ocr = _limpar_texto(ocr_resultado["texto_completo"])
         _log.info("[DOCUMENTOS] OCR texto bruto (sem páginas): %d chars", len(texto_ocr))
 
     # ── Camadas 1+2: Extração Gemini + Claude EM PARALELO ───────────────
@@ -559,9 +573,9 @@ def execute(processo) -> ServiceResult:
     if texto_ocr:
         extracao_json["ocr_markdown"] = texto_ocr
     if texto_gemini:
-        extracao_json["raw_gemini"] = texto_gemini[:2000]
+        extracao_json["raw_gemini"] = _limpar_texto(texto_gemini[:2000])
     if texto_claude:
-        extracao_json["raw_anthropic"] = texto_claude[:2000]
+        extracao_json["raw_anthropic"] = _limpar_texto(texto_claude[:2000])
 
     doc_consolidado = docs.get("consolidado")
     if doc_consolidado:
