@@ -70,19 +70,27 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--reprocessar-teses", action="store_true",
-            help="Após re-OCR, re-roda a Fase 4 nos afetados sem teses reais.",
+            help="Após re-OCR, re-roda a Fase 4 nos afetados que estão no "
+                 "placeholder 'sem teses' (não sobrescreve teses já decididas).",
+        )
+        parser.add_argument(
+            "--excluir-fase", nargs="+", default=None,
+            help="Pula processos nestas fases (ex.: --excluir-fase finalizado).",
         )
 
     def handle(self, *args, **options):
         ids = options["processo"]
         aplicar = options["apply"]
         reprocessar_teses = options["reprocessar_teses"]
+        excluir_fase = options["excluir_fase"]
 
         # O ocr_markdown só é gravado no doc consolidado (o Document AI só
         # processa docs_dict["consolidado"]), então basta varrer esses.
         docs = Documento.objects.filter(tipo="consolidado").select_related("processo")
         if ids:
             docs = docs.filter(processo_id__in=ids)
+        if excluir_fase:
+            docs = docs.exclude(processo__fase__in=excluir_fase)
 
         total = 0
         afetados = []
@@ -147,14 +155,18 @@ class Command(BaseCommand):
 
                 if reprocessar_teses:
                     tese_atual = p.teses.order_by("ordem").first()
-                    sem_teses_reais = tese_atual is None or is_placeholder_tese(tese_atual.titulo)
-                    if sem_teses_reais:
+                    # Só re-roda onde HÁ um placeholder "sem teses". Se ainda não
+                    # há tese (None), a Fase 4 nem rodou — vai rodar naturalmente
+                    # depois, já com o OCR corrigido; não antecipar.
+                    if tese_atual is not None and is_placeholder_tese(tese_atual.titulo):
                         res = execute_extracao(p)
                         self.stdout.write(
                             f"   Fase 4 re-rodada: {getattr(res, 'mensagem', res)}"
                         )
+                    elif tese_atual is None:
+                        self.stdout.write("   Fase 4 ainda não rodou — só OCR corrigido.")
                     else:
-                        self.stdout.write("   Fase 4 preservada (já há teses decididas).")
+                        self.stdout.write("   Fase 4 preservada (já há teses reais).")
             except Exception as e:
                 self.stderr.write(f"  [erro] processo={p.id}: {e}")
 
