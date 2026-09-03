@@ -49,13 +49,23 @@ def _obter_md_defesa(doc_consolidado, paginas_str: str) -> str | None:
             else:
                 paginas.add(int(parte))
 
-        # Parsear MD por seções "## Página N"
-        blocos = re.split(r'\n*---\n*', ocr_md)
+        # Fatiar pelo CABEÇALHO "## Página N", NÃO por "---": o conteúdo OCR contém
+        # linhas de tracejado (letterheads/separadores de peças eletrônicas). Splitar
+        # por "---" quebrava a página no meio e só o 1º pedaço (o letterhead) casava
+        # "## Página N" — o corpo (a tese) virava bloco órfão e era descartado, e a
+        # Fase 4 concluía "não há teses". (#defesa-truncada)
+        partes = re.split(r'(?m)^##\s*Página\s+(\d+)\s*$', ocr_md)
+        # partes = [preâmbulo, num1, corpo1, num2, corpo2, ...]
         filtrados = []
-        for bloco in blocos:
-            m = re.match(r'## Página (\d+)', bloco)
-            if m and int(m.group(1)) in paginas:
-                filtrados.append(bloco.strip())
+        for k in range(1, len(partes) - 1, 2):
+            try:
+                num = int(partes[k])
+            except (ValueError, TypeError):
+                continue
+            if num in paginas:
+                # Remove o separador de página ("---") que fica no fim do corpo.
+                corpo = re.sub(r'\n*-{3,}\n*\Z', '', partes[k + 1]).strip()
+                filtrados.append(f"## Página {num}\n\n{corpo}")
 
         if filtrados:
             return "\n\n---\n\n".join(filtrados)
