@@ -183,6 +183,7 @@ class DocumentAIClient:
             # conteúdo — nada de perder página escaneada num PDF misto.
             paginas_finais = [None] * total_pages   # dict por índice de página
             faltantes = []                          # índices que precisam de OCR
+            nativo_faltantes = {}                   # índice -> texto nativo (fallback)
             for i, page in enumerate(doc):
                 texto = page.get_text("text") or ""
                 n_chars = len(texto.strip())
@@ -194,6 +195,11 @@ class DocumentAIClient:
                     paginas_finais[i] = {"numero": i + 1, "texto": texto, "confianca": 1.0}
                 else:
                     faltantes.append(i)
+                    # Guarda o nativo p/ o Passo D decidir "manter o mais longo":
+                    # em PDF pesquisável (imagem + camada de texto COMPLETA) o nativo
+                    # já é bom e o re-OCR não deve encurtá-lo. Só páginas realmente
+                    # escaneadas (nativo = rodapé) ganham conteúdo com o OCR.
+                    nativo_faltantes[i] = texto
 
             # ── Atalho: PDF 100% nativo → nenhum OCR ────────────────────────
             if not faltantes:
@@ -268,6 +274,14 @@ class DocumentAIClient:
                         sum(block_confidences) / len(block_confidences)
                         if block_confidences else 0.0
                     )
+                    # Não-destrutivo: se o texto nativo era MAIOR que o do OCR, a
+                    # página já tinha camada de texto completa (PDF pesquisável) —
+                    # mantém o nativo. O OCR só prevalece quando RECUPERA conteúdo
+                    # (corpo escaneado que faltava). Evita encurtar/degradar.
+                    nativo = nativo_faltantes.get(orig_i, "")
+                    if len(nativo.strip()) > len(page_text.strip()):
+                        page_text = nativo
+                        page_conf = 1.0
                     ocr_confs.append(page_conf)
                     paginas_finais[orig_i] = {
                         "numero": orig_i + 1,

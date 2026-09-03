@@ -140,6 +140,17 @@ class Command(BaseCommand):
                 novo_md = service_documentos._ocr_para_markdown(ocr_resultado)
                 antigo = (doc.extracao_json or {}).get("ocr_markdown") or ""
 
+                # Não-destrutivo: só sobrescreve se o novo OCR RECUPEROU conteúdo
+                # (é mais longo). Se vier igual/menor, o texto salvo já estava bom
+                # (PDF pesquisável) — não encolhe o que está no banco. (auto-cura os
+                # processos que a versão anterior do fix havia encurtado.)
+                if len(novo_md) <= len(antigo):
+                    self.stdout.write(
+                        f"SKIP processo={p.id} OCR {len(antigo)}→{len(novo_md)} "
+                        f"(sem ganho de conteúdo — mantido)"
+                    )
+                    continue
+
                 extracao = doc.extracao_json or {}
                 extracao["ocr_markdown"] = novo_md
                 extracao["ocr_confianca"] = ocr_resultado["confianca_media"]
