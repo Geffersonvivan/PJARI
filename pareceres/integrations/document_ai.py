@@ -23,10 +23,49 @@ _BATCH_SIZE = 15
 # escaneadas (imagem pura) retornam ~0 chars e continuam indo para o Document AI.
 _MIN_CHARS_PAGINA = 50
 
+# Acima deste número de caracteres nativos a página é claramente digital: confiamos
+# no texto e não checamos imagem (evita falso-positivo por marca d'água/letterhead
+# de página inteira). Rodapés de assinatura eletrônica ficam MUITO abaixo disto.
+_MIN_CHARS_TEXTO_DIGITAL = 800
+
+# Fração da área da página coberta por imagem a partir da qual a página é tratada
+# como escaneada — vai para o OCR mesmo que tenha uma fina camada de texto nativo.
+_IMG_COVER_SCANNED = 0.5
+
 # Máximo de lotes de OCR processados em paralelo (I/O de rede). Configurável.
 _DOCAI_MAX_PARALLEL = int(os.environ.get("DOCAI_MAX_PARALLEL", "6"))
 
 _log = logging.getLogger(__name__)
+
+
+def _pagina_escaneada(page, texto_len: int) -> bool:
+    """True se a página parece ser uma imagem escaneada — deve ir ao OCR mesmo
+    que tenha uma fina camada de texto nativo.
+
+    Peças eletrônicas (SEI/PJe/eProc) escaneiam o corpo como imagem e carimbam um
+    rodapé de assinatura ("assinado eletronicamente por FULANO, OAB/SC …") que,
+    sozinho, passa do limiar de caracteres. Sem esta checagem o OCR seria pulado e
+    a tese (no corpo escaneado) nunca seria lida — a Fase 4 então "não encontra
+    teses", vendo só a repetição do nome/OAB do rodapé.
+
+    Texto abundante (>= _MIN_CHARS_TEXTO_DIGITAL) indica página nativa de verdade:
+    confiamos nela e não checamos imagem, evitando falso-positivo por marca d'água
+    ou letterhead de página inteira.
+    """
+    if texto_len >= _MIN_CHARS_TEXTO_DIGITAL:
+        return False
+    try:
+        page_area = abs(page.rect.width * page.rect.height)
+        if page_area <= 0:
+            return False
+        img_area = 0.0
+        for img in page.get_images(full=True):
+            for rect in page.get_image_rects(img[0]):
+                img_area += abs(rect.width * rect.height)
+        return (img_area / page_area) >= _IMG_COVER_SCANNED
+    except Exception:
+        # Na dúvida, não força OCR (preserva o comportamento antigo p/ a página).
+        return False
 
 
 def _get_credentials():
@@ -146,7 +185,12 @@ class DocumentAIClient:
             faltantes = []                          # índices que precisam de OCR
             for i, page in enumerate(doc):
                 texto = page.get_text("text") or ""
-                if len(texto.strip()) >= _MIN_CHARS_PAGINA:
+                n_chars = len(texto.strip())
+                # Página escaneada com fina camada de texto (rodapé de assinatura
+                # eletrônica: "assinado por FULANO, OAB/SC …") passa do limiar de
+                # caracteres mas o corpo (a tese) é imagem. Sem esta checagem o OCR
+                # seria pulado e a defesa nunca seria lida. (#teses-vazias)
+                if n_chars >= _MIN_CHARS_PAGINA and not _pagina_escaneada(page, n_chars):
                     paginas_finais[i] = {"numero": i + 1, "texto": texto, "confianca": 1.0}
                 else:
                     faltantes.append(i)
